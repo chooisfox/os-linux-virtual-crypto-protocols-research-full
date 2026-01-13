@@ -1,0 +1,32 @@
+\begin{minted}[tabsize=4]{c}
+#include <crypto/shash.h>
+
+static int hash_init(struct shash_desc desc) { /* */ return 0; }
+static int hash_update(struct shash_desc *desc,
+    const u8 data, unsigned int len) { /* */ return 0; }
+static int hash_final(struct shash_desc *desc, u8 out) { /* */ return 0; }
+
+static struct shash_alg my_alg = {
+    .init = hash_init,
+    .update = hash_update,
+    .final = hash_final,
+    .digestsize = 32,
+    .descsize = sizeof(struct hash_ctx),
+    .base = {
+        .cra_name = "hash",
+        .cra_driver_name= "hash-generic",
+        .cra_blocksize = 64,
+        .cra_module = THIS_MODULE,
+    }
+};
+
+static int __init hash_mod_init(void)
+{
+    return crypto_register_shash(&my_alg);
+}
+
+static void __exit hash_mod_exit(void)
+{
+    return crypto_unregister_shash(&my_alg);
+}
+\end{minted}

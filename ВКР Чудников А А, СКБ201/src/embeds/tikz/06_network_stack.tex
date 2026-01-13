@@ -1,0 +1,89 @@
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1cm and 0.1cm,
+    layer_box/.style={rectangle, draw, fill=teal!20,
+                      minimum width=4.1cm, minimum height=1cm,
+                      font=\footnotesize\bfseries},
+    data_block/.style={rectangle, draw, fill=blue!20,
+                       minimum width=1.8cm, text height=1.5ex, text depth=0.25ex, font=\footnotesize\bfseries},
+    header_block/.style={rectangle, draw, fill=orange!30,
+                         minimum width=1.0cm, text height=1.5ex, text depth=0.25ex,
+                         font=\footnotesize},
+    arrow_style/.style={-Stealth[], thick, shorten >=2pt, shorten <=2pt}
+]
+
+\draw[black, dot diameter=2pt, dot spacing=5pt, dots] (-8,0)  -- (8,0);
+\draw[black, dot diameter=2pt, dot spacing=5pt, dots] (-8,-2) -- (8,-2);
+\draw[black, dot diameter=2pt, dot spacing=5pt, dots] (-8,-4) -- (8,-4);
+\draw[black, dot diameter=2pt, dot spacing=5pt, dots] (-8,-6) -- (8,-6);
+\draw[black, dot diameter=2pt, dot spacing=5pt, dots] (-8,-8) -- (8,-8);
+
+% ===================================================================
+% Шаг 1: Рисуем центральную колонку с названиями уровней
+% ===================================================================
+\node (app) at (0,-1) [layer_box] {Прикладной уровень};
+\node (trn)  [layer_box, below=of app] {Транспортный уровень};
+\node (net)  [layer_box, below=of trn] {Сетевой уровень};
+\node (link) [layer_box, below=of net] {Канальный уровень};
+
+% ===================================================================
+% Шаг 2: Рисуем левую колонку - ИНКАПСУЛЯЦИЯ (отправка)
+% ===================================================================
+\node [above=0.5cm of app, xshift=-3.5cm] {\textbf{Инкапсуляция (отправка)}};
+
+% Уровень приложения
+\node (encap_app_data) [data_block, left=of app] {Данные};
+
+% Транспортный уровень
+\node (encap_trn_data) [data_block, left=of trn] {Данные};
+\node (encap_trn_hdr)  [header_block, left=of encap_trn_data, node distance=0] {TCP/UDP};
+
+% Сетевой уровень
+\node (encap_net_data) [data_block, left=of net] {Данные};
+\node (encap_net_hdr1) [header_block, left=of encap_net_data, node distance=0] {TCP/UDP};
+\node (encap_net_hdr2) [header_block, left=of encap_net_hdr1, node distance=0] {IP};
+
+% Канальный уровень
+\node (encap_link_data) [data_block, left=of link] {Данные};
+\node (encap_link_hdr1) [header_block, left=of encap_link_data, node distance=0] {TCP/UDP};
+\node (encap_link_hdr2) [header_block, left=of encap_link_hdr1, node distance=0] {IP};
+\node (encap_link_hdr3) [header_block, left=of encap_link_hdr2, node distance=0] {Кадр};
+
+% Стрелки вниз
+\draw [arrow_style] (encap_app_data.south) -- (encap_trn_data.north);
+\draw [arrow_style] (encap_trn_data.south) -- (encap_net_data.north);
+\draw [arrow_style] (encap_net_data.south) -- (encap_link_data.north);
+
+% ===================================================================
+% Шаг 3: Рисуем правую колонку - ДЕКАПСУЛЯЦИЯ (получение)
+% ===================================================================
+\node [above=0.5cm of app, xshift=3.5cm] {\textbf{Декапсуляция (получение)}};
+
+% Канальный уровень
+\node (decap_link_data) [data_block, right=of link] {Данные};
+\node (decap_link_hdr1) [header_block, right=of decap_link_data, node distance=0] {TCP/UDP};
+\node (decap_link_hdr2) [header_block, right=of decap_link_hdr1, node distance=0] {IP};
+\node (decap_link_hdr3) [header_block, right=of decap_link_hdr2, node distance=0] {Кадр};
+
+% Сетевой уровень
+\node (decap_net_data) [data_block, right=of net] {Данные};
+\node (decap_net_hdr1) [header_block, right=of decap_net_data, node distance=0] {TCP/UDP};
+\node (decap_net_hdr2) [header_block, right=of decap_net_hdr1, node distance=0] {IP};
+
+% Транспортный уровень
+\node (decap_trn_data) [data_block, right=of trn] {Данные};
+\node (decap_trn_hdr)  [header_block, right=of decap_trn_data, node distance=0] {TCP/UDP};
+
+% Уровень приложения
+\node (decap_app_data) [data_block, right=of app] {Данные};
+
+% Стрелки вверх
+\draw [arrow_style] (decap_link_data.north) -- (decap_net_data.south);
+\draw [arrow_style] (decap_net_data.north) -- (decap_trn_data.south);
+\draw [arrow_style] (decap_trn_data.north) -- (decap_app_data.south);
+
+\end{tikzpicture}
+\caption{Процессы инкапсуляции и декапсуляции данных в модели TCP/IP}
+\label{fig:encap_decap}
+\end{figure}

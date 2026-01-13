@@ -1,0 +1,66 @@
+\begin{minted}[tabsize=4]{c}
+/* Основная функция вычисления общего секрета (VKO).
+ * Выполняет роль callback-функции для KPP API ядра.
+ */
+static int gost_vko_compute_value(struct kpp_request *req)
+{
+    struct crypto_kpp *tfm = crypto_kpp_reqtfm(req);
+    struct gost_vko_ctx *ctx = gost_vko_get_ctx(tfm);
+    u64 scalar[GOST_EC256_NDIGITS];
+
+    /* ... */
+
+    if (req->src) {
+        /* --- Режим вычисления общего секрета (Shared Secret) --- */
+
+        /* 1. Декодирование публичного ключа партнера (точка Q).
+         * Ключ приходит в формате Big-Endian (64 байта), преобразуем
+         * во внутренний формат VLI (массив u64).
+         */
+        /* Координата X */
+        gost_vli_from_be(public_key_buf, req->src, GOST_EC256_NDIGITS);
+        /* Координата Y (смещение 32 байта) */
+        gost_vli_from_be(public_key_buf + GOST_EC256_NDIGITS,
+                         req->src + GOST_EC256_KEY_SIZE, GOST_EC256_NDIGITS);
+
+        /* 2. Вычисление эффективного скаляра S.
+         * Согласно ГОСТ Р 34.10-2012:
+         * Если передан UKM (User Keying Material), то S = (d * UKM) mod n.
+         * Иначе S = d (собственный закрытый ключ).
+         */
+        if (ctx->params.ukm_size > 0) {
+            gost_vli_mod_mult(scalar, ctx->params.key, ctx->params.ukm,
+                              ctx->curve->n, GOST_EC256_NDIGITS);
+        } else {
+            memcpy(scalar, ctx->params.key, sizeof(scalar));
+        }
+
+        /* 3. Скалярное умножение точки кривой.
+         * Вычисляем точку K = S * Q_peer.
+         * Функция использует алгоритм с защитой от атак по времени.
+         */
+        gost_ec256_point_mul(shared_secret_x,     /* Результат (Координата X) */
+                             temp_y,              /* Результат Y (отбрасывается) */
+                             public_key_buf,      /* Peer X */
+                             public_key_buf + GOST_EC256_NDIGITS, /* Peer Y */
+                             scalar, ctx->curve);
+
+        /* 4. Формирование KEK (Key Encryption Key).
+         * Согласно алгоритму VKO, общим секретом является хэш от
+         * координаты X полученной точки: KEK = Hash(K.x)
+         */
+        /* ... Вызов хэширования streebog256(shared_secret_x) ... */
+    }
+    else {
+        /* --- Режим генерации собственного публичного ключа --- */
+        /* Q = d * G, где G - базовая точка кривой */
+        gost_ec256_point_mul(public_key_buf,
+                             public_key_buf + GOST_EC256_NDIGITS,
+                             ctx->curve->g.x, ctx->curve->g.y,
+                             ctx->params.key, ctx->curve);
+    }
+
+    /* ... Копирование результата в req->dst ... */
+    return 0;
+}
+\end{minted}

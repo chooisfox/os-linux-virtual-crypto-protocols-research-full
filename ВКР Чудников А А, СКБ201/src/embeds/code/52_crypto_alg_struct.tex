@@ -1,0 +1,45 @@
+\begin{minted}[tabsize=4]{c}
+struct crypto_alg {
+    struct list_head cra_list;
+    struct list_head cra_users;
+
+    u32 cra_flags; /* Набор флагов, описывающих алгоритм */
+
+    unsigned int cra_blocksize; /* Размер блока шифра в байтах */
+    unsigned int cra_ctxsize;   /* Размер структуры контекста */
+    unsigned int cra_alignmask; /* Маска выравнивания входных
+                                   и выходных данных */
+
+    int cra_priority; /* Приоритет реализации */
+
+    refcount_t cra_refcnt;
+
+    char cra_name[CRYPTO_MAX_ALG_NAME];        /* Имя алгоритма */
+    char cra_driver_name[CRYPTO_MAX_ALG_NAME]; /* Имя драйвера */
+
+    const struct crypto_type *cra_type;  /* Тип криптопреобразования */
+    /* Указатель на структуру crypto_type, реализующую
+     * общие функции обратного вызова.
+     *
+     * Доступные варианты:
+     * - &crypto_blkcipher_type
+     * - &crypto_ablkcipher_type
+     * - &crypto_ahash_type
+     * - &crypto_rng_type
+     *
+     * Оставляется пустым для шифрования блока (cipher),
+     * сжатия (compress) и блокирующего хэширования (shash).
+     */
+
+    union {
+        struct cipher_alg cipher;
+        struct compress_alg compress;
+    } cra_u;
+
+    int (*cra_init)(struct crypto_tfm *tfm);
+    void (*cra_exit)(struct crypto_tfm *tfm);
+    void (*cra_destroy)(struct crypto_alg *alg);
+
+    struct module *cra_module;
+};
+\end{minted}

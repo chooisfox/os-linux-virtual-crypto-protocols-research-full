@@ -1,0 +1,40 @@
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    auto,
+    node distance = 2cm and 2.5cm,
+    block/.style = {
+        rectangle,
+        draw,
+        minimum height=2.5em,
+        text width=6.5em,
+        text centered,
+        font=\sffamily
+    },
+    container/.style = {
+        rectangle,
+        draw,
+        inner sep=10pt
+    }
+]
+    \node[block, fill=teal!20] (interface) {\textbf{Сетевой интерфейс}};
+    \node[block, fill=teal!20, right=of interface] (device) {\textbf{Устройство}};
+    \node[block, fill=teal!20, text width=7em, right=of device] (adapter) {\textbf{Сетевой адаптер}};
+
+    \node[container, fill=teal!15, fit=(device), inner ysep=15pt, inner xsep=50pt, yshift=10pt] (driver_box) {};
+    \node[container, fill=teal!10, fit=(interface) (driver_box)] (linux_box) {};
+    \node[container, fill=teal!15, fit=(device), inner ysep=15pt, inner xsep=50pt, yshift=10pt] (driver_box) {};
+
+    \node[block, fill=teal!20] (interface) {\textbf{Сетевой интерфейс}};
+    \node[block, fill=teal!20, right=of interface] (device) {\textbf{Устройство}};
+    \node[block, fill=teal!20, text width=7em, right=of device] (adapter) {\textbf{Сетевой адаптер}};
+
+    \node[anchor=north, yshift=-2pt] at (driver_box.north) {\textbf{Драйвер сетевого устройства}};
+    \node[anchor=north west, inner sep=5pt] at (linux_box.north west) {\textbf{Ядро Linux}};
+
+    \draw[-Latex] (interface.east) -- (device.west);
+    \draw[-Latex] (device.east) -- (adapter.west);
+\end{tikzpicture}
+\caption{Сетевой интерфейс в Linux.}
+\label{fig:linux-net-stack}
+\end{figure}

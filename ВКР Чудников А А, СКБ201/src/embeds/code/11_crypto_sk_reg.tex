@@ -1,0 +1,32 @@
+\begin{minted}{c}
+static struct skcipher_alg cbc_xor_cipher_alg =
+{
+    .base.cra_name = "cbc(xor-cipher)",
+    .base.cra_driver_name = "cbc-xor-cipher-manual",
+    .base.cra_priority = 200,
+    .base.cra_flags = CRYPTO_ALG_ASYNC,
+    .base.cra_blocksize = 1,
+    .base.cra_ctxsize = sizeof(struct xor_cipher_ctx),
+    .base.cra_module = THIS_MODULE,
+    .min_keysize    = XOR_CIPHER_KEY_SIZE,
+    .max_keysize    = XOR_CIPHER_KEY_SIZE,
+    .ivsize         = XOR_CIPHER_BLOCK_SIZE,
+    .chunksize      = XOR_CIPHER_BLOCK_SIZE,
+    .setkey         = ... ,
+    .encrypt        = xor_cbc_encrypt,
+    .decrypt        = xor_cbc_decrypt
+};
+
+static int __init xor_cipher_init(void)
+{
+    return crypto_register_skcipher(&cbc_xor_cipher_alg);
+}
+
+static void __exit xor_cipher_exit(void)
+{
+    crypto_unregister_skcipher(&cbc_xor_cipher_alg);
+}
+
+module_init(xor_cipher_init);
+module_exit(xor_cipher_exit);
+\end{minted}

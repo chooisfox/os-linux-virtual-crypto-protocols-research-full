@@ -1,0 +1,736 @@
+\section{Программная реализация и тестирование}
+
+Разработанный автором работы программный комплекс, реализующий виртуальный криптографический сетевой интерфейс, получил название \texttt{WireGost}.
+Ключевым архитектурным принципом разработки стала максимальная интеграция с существующей инфраструктурой ядра \texttt{Linux} и использование стандартных механизмов операционной системы.\\
+
+С целью упрощения разработки, для всех используемых криптографических модулей ядра были написаны <<функции-обёртки>>, позволяющие намного проще вносить изменения в реализацию модулей, без необходимости внесения изменений в основную часть кода модуля \texttt{WireGost}. ~\SeeApp{app:wiregost}
+
+\subsection{Реализация криптографических примитивов ГОСТ}
+
+\subsubsection{Алгоритм хэширования ГОСТ Р 34.11-2012}
+
+Анализ исходного кода ядра \texttt{Linux} (для версии 5.10 и выше) показал, что алгоритм ГОСТ Р 34.11-2012 (<<Стрибог>>) не требует разработки, так как он уже является частью \texttt{Crypto API}. Несмотря на то, что изменение модуля не требовалось, автором было решено всё равно использовать промежуточный слой абстракции, упомянутый ранее, с целью того, чтобы держать кодовую базу в более однородном формате. Этот слой абстракции был расположен в файле \texttt{gost/gost\_streebog.c}.
+
+\nlparagraph{Инициализация и управление контекстом}
+
+Благодаря использованию промежуточного слоя абстракции, удалось незначительно оптимизировать работу модуля путем инициализации дескриптора алгоритма (\texttt{tfm} — transformation object) единожды при загрузке модуля, а не при каждом вычислении хэша.\\
+
+Функция инициализации \texttt{gost\_streebog\_init\_module} выполняет следующие критические операции:
+\begin{enumerate}
+    \item запрос алгоритма \texttt{"streebog256"} через вызов \texttt{crypto\_alloc\_shash};
+    \item контроль корректности выделения ресурсов;
+    \item проверка размера контекста хэширования. Поскольку структура состояния \texttt{struct gost\_streebog\_state} размещается на стеке ядра, необходимо гарантировать, что её размер не превышает зарезервированный буфер \texttt{GOST\_STREEBOG\_CTX\_SIZE}, чтобы избежать переполнения стека.
+\end{enumerate}
+
+\nlparagraph{Программный интерфейс}
+Реализован набор <<функций-оберток>>, инкапсулирующих вызовы Crypto API:
+\begin{itemize}
+    \item \texttt{gost\_streebog256\_init}: связывание контекста с глобальным дескриптором и сброс состояния;
+    \item \texttt{gost\_streebog256\_update}: подача данных на вход функции сжатия;
+    \item \texttt{gost\_streebog256\_final}: финализация вычислений и формирование дайджеста.
+\end{itemize}
+
+\input{src/embeds/code/61_impl_streebog}
+
+\subsubsection{Конструкция HMAC на базе ГОСТ Р 34.11-2012}
+
+Оригинальный протокол \texttt{WireGuard} использует хэш-функцию \texttt{BLAKE2s}, поддерживающую режим <<хэширования с ключом>>. Алгоритм <<Стрибог>>, реализованный в ядре, является <<чистой>> хэш-функцией и не поддерживает инициализацию ключом. \\
+
+Для обеспечения аутентификации сообщений и реализации функций формирования ключа (\texttt{KDF}) была программно реализована схема \texttt{HMAC} (\texttt{Hash-based Message Authentication Code}) в соответствии с \texttt{RFC 2104}~\cite{rfc2104} и рекомендациями \texttt{RFC 7836}~\cite{rfc7836}.\\
+
+HMAC-Стрибог был реализован в файле \texttt{gost/gost\_hmac.c}, сам алгоритм при этом базируется на формуле:
+$$
+    \text{HMAC}(K, m) = H((K' \oplus opad) \parallel H((K' \oplus ipad) \parallel m))
+$$
+
+Где $K'$ — нормализованный ключ, $ipad$ и $opad$ — константы внутреннего и внешнего дополнения соответственно.
+
+\nlparagraph{Особенности реализации}
+
+Ключевым требованием к реализации в пространстве ядра является безопасная работа с памятью. Функция \texttt{gost\_hmac256} обеспечивает принудительную очистку всех буферов, содержащих производные ключа и промежуточные хэши, с помощью вызова \texttt{memzero\_explicit}, исключая утечку ключевого материала.
+
+\input{src/embeds/code/60_impl_hmac}
+
+\subsubsection{Блочный шифр <<Кузнечик>> и режим MGM}
+
+В отличие от алгоритма хэширования реализация блочного шифра ГОСТ Р 34.12-2015 (<<Кузнечик>>) отсутствует в ядре Linux. Так что было принято решение разработать свой собственный загружаемый модуль ядра, который его реализует.\\ ~\SeeApp{app:modules}
+
+Для обеспечения конфиденциальности и целостности данных, согласно требованиям протокола, используется режим аутентифицированного шифрования (AEAD). В соответствии с ГОСТ Р 34.13-2015~\cite{gost_34_12_2015} был выбран режим гаммирования с мультилинейным преобразованием — \texttt{MGM} (Multilinear Galois Mode).
+
+\nlparagraph{Оптимизация производительности}
+
+<<Кузнечик>> является шифром на основе \texttt{SP}-сети. Прямая программная реализация линейного преобразования $L$ (умножение вектора на матрицу в поле $GF(2^8)$) обладает низкой производительностью. Для обеспечения пропускной способности, сравнимой с оригинальной версией \texttt{WireGuard}, была применена техника предварительно вычисленных таблиц.\\
+
+Преобразование $L \circ S$ над 128-битным блоком заменяется на сумму результатов выборки из таблиц:
+$$
+    L(S(a_0, \dots, a_{15})) = \bigoplus_{i=0}^{15} T_i[a_i]
+$$
+где $T_i$ — таблицы размером $256 \times 128$ бит.
+
+При написании модуля были применены следующие техники оптимизации:
+\begin{itemize}
+    \item \textbf{Предварительный расчет таблиц:} использование 16 таблиц для шифрования и 16 для расшифрования;
+    \item \textbf{Развертка циклов:} полная развертка циклов внутри раундов шифрования;
+    \item \textbf{Невыравненный доступ к буферам:} использование макросов \texttt{get\_unaligned} / \texttt{put\_unaligned} для работы с сетевыми буферами без предварительного копирования.
+\end{itemize}
+
+\nlparagraph{Реализация режима MGM}
+
+Режим \texttt{MGM} работает по схеме \texttt{Encrypt-then-MAC}. Ключевой операцией, влияющей на скорость, является умножение в поле Галуа $GF(2^{128})$ при вычислении имитовставки. В реализации задействована оптимизированная функция ядра \texttt{gf128mul\_x\_bbe} и 64-битные инструкции XOR.
+
+\input{src/embeds/code/62_impl_kuznyechik_mgm}
+
+\nlparagraph{Слой абстракции \texttt{AEAD}}
+
+По аналогии с другими алгоритмами был также написан слой абстракции \texttt{AEAD} для шифрования и аутентификации данных. (\texttt{gost/gost\_kuznyechik.c})
+
+\input{src/embeds/code/63_impl_kuznyechik_wrapper}
+
+\subsubsection{Протокол выработки общего ключа VKO ГОСТ Р 34.10-2012}
+
+В качестве замены алгоритму \texttt{ECDH} (\texttt{Curve25519}) реализован протокол \texttt{VKO} (Выработка Ключа Обмена) на базе эллиптических кривых. Модуль \texttt{ec256\_vko} регистрируется в ядре как примитив типа \texttt{KPP} (Key-agreement Protocol Primitive). ~\SeeApp{app:modules}
+
+\nlparagraph{Параметры алгоритма}
+
+Используется 256-битная эллиптическая кривая с параметрами \texttt{id-tc26-gost-3410-2012-256-paramSetA}. Вычисление общей точки производится по формуле:
+
+$$
+    K = (h \cdot d_{local}) \times Q_{remote}
+$$
+
+Для арифметических операций с большими числами (\texttt{BigInt}) адаптирована библиотека \texttt{crypto/ecc.c}, обеспечивающая выполнение операций за постоянное время, что защищает от атак по побочным каналам.
+
+\nlparagraph{Программная реализация}
+
+Особенностью программной реализации является работа с 64-байтными открытыми ключами (две координаты по 32 байта) и поддержка параметра \texttt{UKM} (\texttt{User Keying Material}). Функция \texttt{gost\_vko\_compute\_value} выполняет декодирование ключей, скалярное умножение и хэширование результата для получения сессионного ключа.
+
+\input{src/embeds/code/64_impl_vko_kpp}
+
+\subsection{Интеграция в сетевой протокол WireGuard}
+
+Дальнейшим шагом разработки \texttt{WireGost} стало внедрение ранее реализованных криптографических примитивов в сетевой протокол \texttt{WireGuard}. Этот шаг оказался довольно сложным, поскольку пришлось переписывать значительную часть кода, связанного с обработкой пакетов, а также общением с пользовательским пространством через \texttt{Netlink}.
+
+\subsubsection{Адаптация структур данных}
+
+Первым этапом портирования стало изменение размера криптографических ключей, так как реализованный алгоритм \texttt{VKO} использует ключи размером 64 байта, что в 2 раза больше, чем в оригинальном протоколе:
+\begin{itemize}
+    \item \textbf{Публичные ключи:} увеличены с 32 до 64 байт (нескомпрессированная точка);
+    \item \textbf{Размер пакета:} изменения отражены в структурах \texttt{message\_handshake\_initiation} и \texttt{message\_handshake\_response} в файле \texttt{messages.h}.
+\end{itemize}
+
+Увеличение заголовков пакетов рукопожатия было учтено при расчете \texttt{MTU} туннеля, чтобы избежать фрагментации пакетов на этапе установления соединения.
+
+\subsubsection{Модификация машины состояний Noise}
+
+Ядро протокола (\texttt{noise.c}) было адаптировано для использования API разработанных модулей. Функция \texttt{mix\_dh}, отвечающая за обновление цепочки ключей (chaining key), переписана для вызова \texttt{gost\_ec256\_dh}.
+Вместо прямой математической операции теперь происходит обращение к KPP API ядра:
+
+\begin{minted}[tabsize=4]{c}
+/* Адаптированная функция mix_dh для VKO ГОСТ */
+static bool mix_dh(u8 *chaining_key, u8 *key, struct wg_peer *peer)
+{
+    u8 shared_secret[NOISE_HASH_LEN];
+    /* Вызов KPP API для вычисления VKO */
+    if (!gost_ec256_dh(shared_secret,
+                      peer->handshake.static_private,
+                      peer->handshake.remote_static,
+                      peer->handshake.ukm,
+                      peer->handshake.ukm_len))
+        return false;
+
+    /* KDF на базе HMAC-Streebog */
+    kdf(chaining_key, key, NULL, shared_secret, ...);
+    memzero_explicit(shared_secret, NOISE_HASH_LEN);
+    return true;
+}
+\end{minted}
+
+\subsubsection{Взаимодействие через Netlink}
+
+Так как был изменен размер ключа, в протоколе \texttt{Netlink} были обновлены атрибуты (\texttt{WGDEVICE\_A\_PEER\_PUBLIC\_KEY}, \texttt{WGDEVICE\_A\_PRIVATE\_KEY}), а в драйвер добавлены проверки, не позволяющие конфигурировать интерфейс ключами некорректной длины.
+
+\subsubsection{Инициализация и управление зависимостями}
+
+Из-за того, что в модуль \texttt{WireGost} был добавлен слой абстракции, для каждого из используемых криптографических алгоритмов необходимо было выполнить инициализацию и деинициализацию.
+Для этого в \texttt{main.c} были добавлены вызовы \texttt{gost\_streebog\_init\_module}, \texttt{gost\_kuznyechik\_init\_tfms}, \texttt{gost\_ec256\_init\_module}.\\
+
+Более того, был расширен набор тестов, которые выполняются при сборке в режиме \texttt{DEBUG}. Были добавлены встроенные тесты, проверяющие корректность работы алгоритмов на эталонных векторах:
+\begin{minted}[tabsize=4]{c}
+#ifdef DEBUG
+	RUN_TEST("Streebog-256", self_test_streebog);
+	RUN_TEST("HMAC-Streebog-256", self_test_hmac_streebog);
+	RUN_TEST("Kuznyechik-MGM", self_test_kuznyechik_mgm);
+	RUN_TEST("GOST R 34.10-2012 (EC512)", self_test_gost_vko_generated);
+
+	pr_info("WireGost crypto self-tests completed successfully.\n");
+#endif
+\end{minted}
+
+Сами тесты были вынесены в \texttt{selftest/selftest.c} к остальным файлам самотестирования. \\
+
+Для упрощения добавления новых тестов был создан макрос \texttt{RUN\_TEST}, который автоматически генерирует код для запуска теста.
+\begin{minted}[tabsize=4]{c}
+#define RUN_TEST(name, func)            \
+do                                      \
+{                                       \
+	pr_info("Testing " name "... ");    \
+	if (func())                         \
+		pr_cont("PASSED\n");            \
+	else                                \
+	{                                   \
+		pr_cont("FAILED\n");            \
+		ret = -EFAULT;                  \
+		goto err_tests;                 \
+	}                                   \
+} while (0)
+\end{minted}
+
+Сами тесты представляют собой набор эталонных значений, определенных в ГОСТ соответствующего протокола.~\cite{gost_34_11_2012} Ниже представлен пример теста для алгоритма \texttt{Streebog-256}.
+\begin{minted}[tabsize=4]{c}
+static bool self_test_streebog(void)
+{
+	u8          digest[32];
+	const char *msg          = "01234567890123456789012345678901"
+		                       "2345678901234567890123456789012";
+	const u8    expected[32] = {0x9d, 0x15, 0x1e, 0xef, 0xd8, 0x59,
+	                            0x0b, 0x89, 0xda, 0xa6, 0xba, 0x6c,
+	                            0xb7, 0x4a, 0xf9, 0x27, 0x5d, 0xd0,
+								0x51, 0x02, 0x6b, 0xb1, 0x49, 0xa4,
+								0x52, 0xfd, 0x84, 0xe5, 0xe5, 0x7b,
+								0x55, 0x00};
+
+	gost_streebog256(digest, (u8 *)msg, 63);
+
+	if (memcmp(digest, expected, 32) != 0)
+	{
+		pr_err("Streebog-256 digest mismatch\n");
+		return false;
+	}
+	return true;
+}
+\end{minted}
+
+\subsubsection{Конфигурация протокола Noise\_GOST}
+
+В файле \texttt{noise.c} определена уникальная строка идентификации протокола:
+\begin{minted}{c}
+"Noise_IKpsk2_GOST_EC512_KuznyechikMGM_Streebog256"
+\end{minted}
+Это гарантирует криптографическую изоляцию сессий \texttt{WireGost} от оригинального \texttt{WireGuard}, предотвращая попытки соединения с несовместимыми клиентами. Функции деривации ключей (\texttt{KDF}) переведены на использование конструкции HMAC-Streebog256.\\
+
+\nlparagraph{Функция формирования ключа (KDF)}
+
+Стандартная реализация \texttt{KDF} в протоколе Noise базируется на \texttt{HKDF} (HMAC-based Key Derivation Function). В разработанном модуле функция была адаптирована для использования \texttt{HMAC} на базе ГОСТ Р 34.11-2012:
+
+\begin{minted}[tabsize=4]{c}
+static void kdf(u8 *first_dst, u8 *second_dst, u8 *third_dst,
+                const u8 *data, size_t first_len, size_t second_len,
+                size_t third_len, size_t data_len,
+                const u8 chaining_key[NOISE_HASH_LEN])
+{
+    u8 output[NOISE_HASH_LEN + 1];
+    u8 secret[NOISE_HASH_LEN];
+
+    /* Шаг 1: Извлечение */
+    gost_hmac256(secret, data, data_len, chaining_key, NOISE_HASH_LEN);
+
+    /* Шаг 2: Расширение для первого ключа */
+    if (first_dst && first_len) {
+        output[0] = 1;
+        gost_hmac256(output, output, 1, secret, NOISE_HASH_LEN);
+        memcpy(first_dst, output, first_len);
+    }
+
+    /* Расширение для второго ключа */
+    if (second_dst && second_len) {
+        output[NOISE_HASH_LEN] = 2;
+        gost_hmac256(output, output, NOISE_HASH_LEN + 1, secret, NOISE_HASH_LEN);
+        memcpy(second_dst, output, second_len);
+    }
+
+    /* ... (аналогично для третьего ключа) ... */
+
+    /* Очистка ключевого материала из памяти */
+    memzero_explicit(secret, NOISE_HASH_LEN);
+    memzero_explicit(output, NOISE_HASH_LEN + 1);
+}
+\end{minted}
+
+\nlparagraph{Обертка шифрования сообщений}
+
+Для интеграции блочного шифра <<Кузнечик>> в режиме \texttt{MGM} в поток обработки пакетов были реализованы функции-обертки \texttt{message\_encrypt} и \texttt{message\_decrypt}. Они выполняют следующие задачи:
+
+\begin{enumerate}
+    \item инициализация контекста шифрования сессионным ключом;
+    \item вызов процедуры \texttt{AEAD}-шифрования;
+    \item обновление текущего хэша рукопожатия шифртекстом, что обеспечивает криптографическое связывание всех сообщений сессии.
+\end{enumerate}
+
+\begin{minted}[tabsize=4]{c}
+static void message_encrypt(u8 *dst_ciphertext, const u8 src_plaintext,
+                            size_t src_len, u8 key[NOISE_SYMMETRIC_KEY_LEN],
+                            u8 hash[NOISE_HASH_LEN])
+{
+    u8 nonce[16] = {0};
+    struct gost_kuznyechik_mgm_ctx ctx;
+    memset(&ctx, 0, sizeof(ctx));
+
+    /* Установка ключа и шифрование */
+    if (likely(gost_kuznyechik_mgm_set_key(&ctx, key) == 0))
+    {
+        gost_kuznyechik_mgm_encrypt(&ctx, dst_ciphertext, src_plaintext,
+                                    src_len, hash, NOISE_HASH_LEN, nonce);
+        gost_kuznyechik_mgm_free_ctx(&ctx);
+    }
+
+    /* MixHash: H = Hash(H || Ciphertext) */
+    mix_hash(hash, dst_ciphertext, noise_encrypted_len(src_len));
+}
+
+static bool message_decrypt(u8 *dst_plaintext, const u8 *src_ciphertext,
+                            size_t src_len, u8 key[NOISE_SYMMETRIC_KEY_LEN],
+                            u8 hash[NOISE_HASH_LEN])
+{
+	u8							   nonce[16] = {0};
+	bool						   ret		 = false;
+	struct gost_kuznyechik_mgm_ctx ctx;
+	memset(&ctx, 0, sizeof(ctx));
+	if (likely(gost_kuznyechik_mgm_set_key(&ctx, key) == 0))
+	{
+		if (gost_kuznyechik_mgm_decrypt(&ctx, dst_plaintext, src_ciphertext,
+		                                src_len, hash, NOISE_HASH_LEN, nonce)
+		    == 0)
+		{
+			ret = true;
+		}
+		gost_kuznyechik_mgm_free_ctx(&ctx);
+	}
+	if (!ret)
+		return false;
+	mix_hash(hash, src_ciphertext, src_len);
+	return true;
+}
+\end{minted}
+
+\nlparagraph{Инкапсуляция и шифрование}
+
+Процесс отправки пакета реализован в файле \texttt{send.c}.\\
+
+Перед шифрованием данные должны быть подготовлены:
+\begin{enumerate}
+    \item \textbf{Выравнивание:} для скрытия точной длины передаваемых данных и соблюдения требований блочного шифра, к пакету добавляется случайное заполнение. Размер выравнивания рассчитывается так, чтобы итоговая длина блока соответствовала требованиям \texttt{MTU} и границам блока шифра;
+    \item \textbf{Формирование заголовка:} создается структура \texttt{message\_data}, содержащая тип сообщения (\texttt{MESSAGE\_DATA}), индекс ключа получателя и 64-битный счетчик (Nonce), используемый для защиты от атак повтора.
+\end{enumerate}
+
+Функция \texttt{encrypt\_packet} выполняет эти действия и вызывает криптографический примитив:
+
+\begin{minted}[tabsize=4]{c}
+static bool encrypt_packet(struct sk_buff *skb, struct noise_keypair *keypair)
+{
+    unsigned int padding_len, plaintext_len, trailer_len;
+    struct message_data header;
+    /* ... */
+    u8 nonce[16] = {0};
+    /* Расчет выравнивания и общей длины текста */
+    padding_len   = calculate_skb_padding(skb);
+    /* Длина трейлера включает имитовставку (Tag) */
+    trailer_len   = padding_len + noise_encrypted_len(0);
+    plaintext_len = skb->len + padding_len;
+
+    /* ... подготовка буфера skb (skb_cow_data) ... */
+
+    /* Формирование заголовка */
+    header              = (struct message_data *)skb_push(skb, sizeof(*header));
+    header->header.type = cpu_to_le32(MESSAGE_DATA);
+    header->key_idx     = keypair->remote_index;
+    header->counter     = cpu_to_le64(PACKET_CB(skb)->nonce);
+
+    /* Использование 64-битного счетчика как части Nonce для MGM */
+    memcpy(nonce, &header->counter, 8);
+
+    /* ... линеаризация буфера ... */
+
+    /* Шифрование "на месте" (in-place) с использованием Кузнечик-MGM */
+    if (gost_kuznyechik_mgm_encrypt(&keypair->sending.mgm_ctx,
+                                    skb->data + sizeof(struct message_data),
+                                    skb->data + sizeof(struct message_data),
+                                    plaintext_len, NULL, 0, nonce))
+    {
+        return false;
+    }
+
+    return true;
+}
+\end{minted}
+
+\nlparagraph{Инкапсуляция и шифрование}
+
+При получении пакета (файл \texttt{receive.c}) драйвер сначала определяет тип сообщения. Если это \texttt{MESSAGE\_DATA}, управление передается функции \texttt{decrypt\_packet}.\\
+
+Процедура расшифрования включает:
+\begin{enumerate}
+    \item \textbf{Проверку счетчика:} извлечение значения \texttt{counter} из заголовка и проверка, не является ли пакет дубликатом (\texttt{Replay Attack Protection});
+    \item \textbf{Расшифрование с аутентификацией:} вызов функции \texttt{gost\_kuznyechik\_mgm\_decrypt}. Режим \texttt{MGM} работает по схеме \texttt{AEAD}, поэтому проверка целостности (сверка имитовставки) происходит одновременно с расшифрованием. Если имитовставка не совпадает, пакет немедленно отбрасывается.
+\end{enumerate}
+
+\begin{minted}[tabsize=4]{c}
+static bool decrypt_packet(struct sk_buff *skb, struct noise_keypair keypair)
+{
+    u8 nonce[16] = {0};
+    /* ... */
+
+    /* Валидация состояния ключа и счетчиков */
+    if (unlikely(!READ_ONCE(keypair->receiving.is_valid) || ... )) {
+        return false;
+    }
+
+    /* Извлечение Nonce из заголовка пакета */
+    PACKET_CB(skb)->nonce = le64_to_cpu(((struct message_data *)skb->data)->counter);
+    memcpy(nonce, &((struct message_data *)skb->data)->counter, 8);
+
+    /* ... подготовка буфера ... */
+
+    /* Дешифрование и проверка имитовставки */
+    if (gost_kuznyechik_mgm_decrypt(&keypair->receiving.mgm_ctx,
+                                    skb->data + sizeof(struct message_data),
+                                    skb->data + sizeof(struct message_data),
+                                    skb->len - sizeof(struct message_data),
+                                    NULL, 0, nonce))
+    {
+        return false;
+    }
+
+    /* Удаление заголовка WireGuard и имитовставки (trim) */
+    if (pskb_trim(skb, skb->len - NOISE_AUTHTAG_LEN))
+        return false;
+    skb_pull(skb, sizeof(struct message_data));
+
+    return true;
+}
+\end{minted}
+
+\subsection{Разработка инструментария конфигурации и тестирования}
+
+Поскольку внедрение алгоритмов описанных в ГОСТ (в частности ГОСТ 34.10-2012 и ГОСТ 34.11-2012)~\cite{gost_34_10_2012, gost_34_11_2012} потребовало изменения длины криптографических ключей (увеличение с 32 до 64 байт для закрытого ключа и до 128 байт для открытого), стандартные утилиты пространства пользователя, такие как \texttt{wg} и \texttt{wg-quick}, оказались несовместимы с разработанным модулем \texttt{WireGost}.\\
+
+Для отладки и тестирования взаимодействия с модулем ядра была разработана специализированная утилита командной строки \texttt{wg\_gost\_cli}. \\
+
+\subsubsection{Архитектура утилиты конфигурации}
+
+Утилита реализована на языке C и взаимодействует с ядром через интерфейс \texttt{Generic Netlink}. В отличие от использования библиотеки \texttt{libmnl}, которая применяется в оригинальном \texttt{WireGuard}, здесь реализовано прямое формирование сообщений \texttt{Netlink} для обеспечения полного контроля над структурой атрибутов. \\
+
+\begin{minted}[tabsize=4]{c}
+/* testing/wg_gost_cli.c */
+#define WG_GENL_NAME "wiregost"
+
+/* Размер закрытого ключа VKO (512 бит) /
+#define GOST_PRIV_KEY_LEN 64
+/ Размер открытого ключа (точка на эллиптической кривой, 64+64 байт) */
+#define GOST_PUB_KEY_LEN 128
+
+/* ... определения атрибутов Netlink (WGDEVICE_A_, WGPEER_A_) ... */
+\end{minted}
+
+\subsubsection{Инициализация интерфейса и генерация ключей}
+
+Основной задачей утилиты является инициализация сетевого интерфейса и генерация ключевой пары. Утилита поддерживает команду \texttt{init}, которая выполняет следующие действия:
+
+\begin{enumerate}
+    \item преобразование имени интерфейса в индекс (\texttt{if\_nametoindex});
+    \item генерация случайного закрытого ключа;
+    \item отправка команды \texttt{WG\_CMD\_SET\_DEVICE} с атрибутом \texttt{WGDEVICE\_A\_PRIVATE\_KEY};
+    \item отправка запроса \texttt{WG\_CMD\_GET\_DEVICE} для получения вычисленного ядром открытого ключа.
+\end{enumerate}
+
+Реализация отправки конфигурации:
+
+\begin{minted}[tabsize=4]{c}
+int cmd_init(int sock, int family_id, int argc, char *argv)
+{
+    /* ... инициализация переменных ... */
+
+    /* Генерация тестового ключа (обнуление старшего байта для валидности) */
+    gen_random_key(priv, GOST_PRIV_KEY_LEN, getpid() + port);
+
+    /* Формирование запроса SET_DEVICE */
+    req.n.nlmsg_len   = NLMSG_LENGTH(GENL_HDRLEN);
+    req.n.nlmsg_type  = family_id;
+    req.n.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
+    req.g.cmd         = WG_CMD_SET_DEVICE;
+
+    /* Добавление атрибутов: индекс, приватный ключ, порт */
+    add_attr(&req, WGDEVICE_A_IFINDEX, &ifindex, sizeof(ifindex));
+    add_attr(&req, WGDEVICE_A_PRIVATE_KEY, priv, GOST_PRIV_KEY_LEN);
+    add_attr(&req, WGDEVICE_A_LISTEN_PORT, &port, sizeof(port));
+
+    /* Отправка в ядро */
+    if (send(sock, &req, req.n.nlmsg_len, 0) < 0) { /* ... */ }
+
+    /* ... чтение ответа и запрос публичного ключа ... */
+}
+\end{minted}
+
+\subsubsection{Настройка пиров}
+
+Вторая ключевая функция --- добавление доверенных узлов (пиров). Команда \texttt{peer} формирует сложное вложенное сообщение \texttt{Netlink}, содержащее структуру \texttt{WGDEVICE\_A\_PEERS}, внутри которой находится список пиров с их параметрами: открытый ключ (128 байт), конечная точка (Endpoint) и разрешенные IP-адреса.\\
+
+Особенностью реализации является корректное формирование вложенных атрибутов (\texttt{NLA\_F\_NESTED}), что необходимо для корректного парсинга со стороны ядра.
+
+\begin{minted}[tabsize=4]{c}
+int cmd_peer(int sock, int family_id, int argc, char *argv)
+{
+    /* ... парсинг аргументов командной строки ... */
+    /* Начало вложенного атрибута списка пиров */
+    struct nlattr *peers = (struct nlattr *)((char *)&req + req.n.nlmsg_len);
+    peers->nla_type      = WGDEVICE_A_PEERS | NLA_F_NESTED;
+    req.n.nlmsg_len     += NLA_HDRLEN;
+
+    /* Начало атрибута конкретного пира */
+    struct nlattr *peer0 = (struct nlattr *)((char *)&req + req.n.nlmsg_len);
+    peer0->nla_type      = 0 | NLA_F_NESTED; /* Индекс 0 */
+    req.n.nlmsg_len     += NLA_HDRLEN;
+
+    /* Установка параметров пира */
+    add_attr(&req, WGPEER_A_PUBLIC_KEY, pub, GOST_PUB_KEY_LEN);
+    add_attr(&req, WGPEER_A_ENDPOINT, &ep4, sizeof(ep4));
+
+    /* ... добавление разрешенных IP (AllowedIPs) ... */
+
+    /* Финализация длин вложенных атрибутов */
+    peer0->nla_len = (char *)&req + req.n.nlmsg_len - (char *)peer0;
+    peers->nla_len = (char *)&req + req.n.nlmsg_len - (char *)peers;
+
+    /* Отправка конфигурации в ядро */
+    if (send(sock, &req, req.n.nlmsg_len, 0) < 0) { /* ... */ }
+
+    return 0;
+}
+\end{minted}
+
+\subsection{Методология тестирования}
+
+Для объективной оценки производительности разработанного решения \texttt{WireGost} и сравнения его с оригинальным протоколом \texttt{WireGuard}, с \texttt{go} версией \texttt{ru-WireGuard} на ГОСТ протоколах, а также с эталонной пропускной способностью канала, был разработан автоматизированный комплекс скриптов на языке \texttt{Bash}.~\SeeApp{app:test_benchmark}
+
+\subsubsection{Тестовая среда и топология}
+
+Тестирование проводилось в изолированной среде с использованием механизма сетевых пространств имен Linux (\texttt{Network Namespaces}). Это позволяет эмулировать полноценное сетевое взаимодействие между двумя узлами на одной физической машине, исключая влияние внешнего сетевого оборудования, но сохраняя полный путь прохождения пакетов через сетевой стек ядра.
+
+Топология тестового стенда формируется функцией \texttt{setup\_namespaces} в библиотеке \texttt{lib\_benchmark.sh}:
+\begin{itemize}
+    \item создаются два пространства имен: \texttt{ns1} (клиент) и \texttt{ns2} (сервер);
+    \item они соединяются парой виртуальных ethernet-интерфейсов (\texttt{veth}), эмулирующих физический канал связи (Underlay network, подсеть 10.0.0.0/24);
+    \item поверх физического канала поднимаются VPN-интерфейсы (Overlay network, подсеть 192.168.1.0/24).
+\end{itemize}
+
+\begin{minted}[tabsize=4]{bash}
+setup_namespaces() {
+    echo -e "${GREEN}[Setup] Creating Namespaces and VETH...${NC}"
+    ip netns add ns1
+    ip netns add ns2
+
+    ip link add veth1 type veth peer name veth2
+    ip link set veth1 netns ns1
+    ip link set veth2 netns ns2
+
+    # Настройка транспортной сети (Underlay)
+    ip netns exec ns1 bash -c "ip addr add 10.0.0.1/24 dev veth1; \
+        ip link set veth1 up"
+    ip netns exec ns2 bash -c "ip addr add 10.0.0.2/24 dev veth2; \
+        ip link set veth2 up"
+}
+\end{minted}
+
+\subsubsection{Архитектура тестового комплекса}
+
+Комплекс построен по модульному принципу. Основная логика измерений вынесена в библиотеку \texttt{lib\_benchmark.sh}, которая предоставляет унифицированный интерфейс для запуска тестов. Специфичные для реализации настройки (настройка WireGuard, ruWireGuard, WireGost или <<чистого>> канала) вынесены в отдельные сценарии, переопределяющие функцию \texttt{setup\_vpn\_impl}.\\
+
+Сценарий тестирования включает следующие этапы:
+\begin{enumerate}
+    \item \textbf{Тест пропускной способности TCP и эффективности CPU:} \\
+    Для тестирования используется утилита \texttt{iperf3}. Кроме измерения скорости (Mbit/s), рассчитывается <<стоимость>> передачи данных для процессора.\\
+    Метрика эффективности рассчитывается по формуле:
+
+    $$
+        Efficiency = \frac{Throughput_{Mbps}}{CPU_{usage}}
+    $$
+    Где $CPU_{usage}$ — суммарное потребление ресурсов ядра и пользователя за время теста.
+    \begin{minted}[tabsize=4]{bash}
+run_tcp_efficiency_test() {
+    # ... запуск сервера и клиента iperf3 ...
+    local cpu_diff=$((cpu_end - cpu_start))
+
+    # Расчет удельной стоимости трафика
+    CPU_COST=$(echo "scale=2; ($cpu_diff / $time_diff_sec)" | bc)
+    EFFICIENCY=$(echo "scale=2; $TCP_MBPS / $CPU_COST" | bc)
+
+    echo -e "    Throughput: ${CYAN}${TCP_MBPS} Mbps${NC}"
+    echo -e "    Efficiency: ${CYAN}${EFFICIENCY}${NC}"
+}
+    \end{minted}
+
+    \item \textbf{Тест максимальной пропускной способности UDP:} \\
+    В отличие от TCP, протокол UDP не имеет встроенных механизмов контроля перегрузки. Запуск \texttt{iperf3} в режиме UDP с флагом \texttt{-b 0} (максимальная полоса) позволяет оценить <<чистую>> производительность канала и процент потери пакетов (\texttt{Packet Loss}), возникающих из-за переполнения буферов или нехватки процессорного времени на шифрование.
+
+    \begin{minted}[tabsize=4]{bash}
+run_udp_saturation_test() {
+    echo -e "${GREEN}[Test] UDP Max Throughput...${NC}"
+    ip netns exec ns1 iperf3 -c 192.168.1.2 -u -b 0 -t $TEST_DURATION \
+        -J > "$LOG_DIR/iperf_udp.json"
+
+    # ... парсинг JSON для получения пропускной способности и потерь ...
+
+    echo -e "    Throughput: ${CYAN}${UDP_MBPS} Mbps${NC}"
+    echo -e "    Packet Loss:${CYAN}${UDP_LOSS}%${NC}"
+}
+    \end{minted}
+
+    \item \textbf{Стресс-тестирование PPS (Packets Per Second):} \\
+    Отправка потока мелких UDP-пакетов (64 байта) для оценки накладных расходов на обработку заголовков, прерываний и вызовов криптографических функций на каждый пакет, что является узким местом для тяжеловесных алгоритмов шифрования.
+
+    \begin{minted}[tabsize=4]{bash}
+run_udp_pps_test() {
+    echo -e "${GREEN}[Test] UDP PPS (64 byte packets)...${NC}"
+    # Отправка пакетов по 64 байта
+    ip netns exec ns1 iperf3 -c 192.168.1.2 -u -l 64 -b 2G -t 5 \
+        -J > "$LOG_DIR/iperf_pps.json"
+
+    # ... расчет среднего PPS ...
+    echo -e "    Result:     ${CYAN}${PPS_RATE} pps${NC}"
+}
+    \end{minted}
+
+    \item \textbf{Тест целостности данных:} \\
+    Для проверки корректности реализации криптографических алгоритмов (особенно режимов сцепления блоков и обработки счетчиков) был разработан тест на целостность передаваемых данных. Для этого из \texttt{/dev/urandom} генерируется файл размером 512 Мб, происходит передача файла через туннель, после чего сверяются контрольные суммы \texttt{MD5} на стороне отправителя и получателя.
+
+    \begin{minted}[tabsize=4]{bash}
+run_file_integrity_test() {
+    echo -e "${GREEN}[Test] File Integrity (${FILE_SIZE_MB} MB)...${NC}"
+    # Генерация случайного файла
+    dd if=/dev/urandom of="$test_file" bs=1M count=$FILE_SIZE_MB \
+        status=none
+    local orig_sum=$(md5sum "$test_file" | awk '{print $1}')
+
+    # Передача через сокет (socat/nc) внутри туннеля
+    # ... передача ...
+
+    # Сверка хеш-сумм
+    if [ "$orig_sum" == "$recv_sum" ]; then
+        echo -e "    Result:     ${CYAN}PASS${NC}"
+    else
+        echo -e "    Result:     ${RED}FAIL${NC} (Checksum Mismatch)"
+    fi
+}
+    \end{minted}
+
+    \item \textbf{Тест задержки под нагрузкой (Latency):} \\
+    Измерение времени отклика (\texttt{RTT}) с помощью утилиты \texttt{ping}, выполняемое параллельно с фоновой генерацией трафика (UDP-поток). Это позволяет оценить влияние очередей и времени шифрования на интерактивность соединения (эффект Bufferbloat).
+
+    \begin{minted}[tabsize=4]{bash}
+run_latency_test() {
+    echo -e "${GREEN}[Test] Latency under Load...${NC}"
+    # Фоновая нагрузка
+    ip netns exec ns1 iperf3 -c 192.168.1.2 -u -b 100M -t 10 \
+        >/dev/null 2>&1 &
+    local load_pid=$!
+    sleep 2
+    # Измерение задержки
+    ip netns exec ns1 ping -c 5 192.168.1.2 > "$LOG_DIR/latency.log"
+    wait $load_pid || true
+    # ... парсинг среднего RTT ...
+    echo -e "    Result:     ${CYAN}${LATENCY_AVG} ms${NC}"
+}
+    \end{minted}
+\end{enumerate}
+
+\subsection{Результаты тестирования}
+
+Тестирование производительности проводилось на аппаратной платформе со следующими характеристиками:
+\begin{itemize}
+    \item \textbf{Процессор:} Intel Core i7-1360P (13-е поколение, архитектура Raptor Lake-P), 16 потоков, максимальная тактовая частота 5.0 ГГц;
+    \item \textbf{Оперативная память:} 16 ГБ LPDDR5;
+    \item \textbf{ОС и Ядро:} Arch Linux, ядро Linux 6.18.1-zen.
+\end{itemize}
+
+Для минимизации влияния планировщика процессов и фоновых задач каждый тест запускался по 10 раз, в качестве результатов пошли усредненные показатели.
+
+\subsubsection{Эталонные показатели (Baseline)}
+
+Измерения <<чистого>> виртуального канала (\texttt{veth}) без шифрования показали теоретический максимум производительности сетевого стека в данном окружении.
+\begin{itemize}
+    \item \textbf{TCP пропускная способность:} $\approx 80.8$ Гбит/с;
+    \item \textbf{UDP пропускная способность:} $\approx 9.6$ Гбит/с;
+    \item \textbf{Стоимость CPU:} 237.96 \texttt{Jiffies}.
+\end{itemize}
+Такие высокие показатели обусловлены тем, что для передачи данных для вычисления эталонных показателей не требуется никаких криптографических преобразований.
+
+\subsubsection{Сравнительный анализ реализаций WireGuard}
+
+В таблице \ref{tab:benchmark_results} приведены сводные результаты тестирования оригинального протокола \texttt{WireGuard}, \texttt{ruWireGuard} и разработанной автором реализации \texttt{WireGost}.~\SeeApp{app:test_results}
+
+\begin{table}[H]
+    \centering
+    \small
+    \setlength{\tabcolsep}{3pt}
+    \caption{Сводная таблица результатов тестирования производительности}
+    \label{tab:benchmark_results}
+    \begin{tabular}{|m{2.5cm}|c|c|c|c|c|}
+        \hline
+        \textbf{Метрика}               & \textbf{WireGuard} & \textbf{ruWireGuard} & \textbf{WireGost} & \textbf{$\Delta$ (WG)} & \textbf{$\Delta$ (ruWG)} \\ \hline
+        TCP T-put \newline (Mbps)      & 5503.61            & 61.54                & 743.12            & $\downarrow 7.4\times$ & $\uparrow 12.1\times$    \\ \hline
+        UDP T-put \newline (Mbps)      & 3553.11            & 39.97                & 845.72            & $\downarrow 4.2\times$ & $\uparrow 21.2\times$    \\ \hline
+        UDP Loss \newline (\%)         & 0.1714\%           & 98.5195\%            & 13.1979\%         & $\downarrow 77\times$  & $\uparrow 7.5\times$     \\ \hline
+        CPU Cost \newline (units)      & 499.05             & 1414.62              & 664.09            & $\downarrow 1.3\times$ & $\uparrow 2.1\times$     \\ \hline
+        Efficiency \newline (Mbps/CPU) & 11.03              & 0.04                 & 1.11              & $\downarrow 9.9\times$ & $\uparrow 27.8\times$    \\ \hline
+        Latency \newline (ms)          & 0.098              & 441.522              & 0.083             & $\uparrow 1.2\times$   & $\uparrow 5300\times$    \\ \hline
+        \multicolumn{6}{l}{
+                \begin{tabular}[c]{@{}l@{}}
+                    \scriptsize \textit{*$\Delta$ (WG) — отношение WireGost к WireGuard;} \\
+                    \scriptsize \textit{**$\Delta$ (ruWG) — отношение WireGost к ruWireGuard.} \\
+                    \scriptsize Важно отметить, что при тестировании \texttt{ruWireGuard} было проведено не 10, а 11 тестов, так как один из них привел к аварийному \\
+                    \scriptsize завершению. К сожалению, так как тестирование проводилось в автоматическом режиме, получить подробную информацию о причине \\
+                    \scriptsize аварийного завершения не удалось, как и повторить условия, при которых оно возникло.
+                \end{tabular}
+            }
+    \end{tabular}
+\end{table}
+
+На основе полученных данных можно сделать следующие выводы о характеристиках разработанного автором программного комплекса:
+
+\nlparagraph{Сравнение \texttt{WireGost} с оригинальным \texttt{WireGuard}}
+
+Как и ожидалось, внедрение российских криптографических алгоритмов привело к снижению пропускной способности. \texttt{WireGost} показал результат в 743 Мбит/с (TCP), что в 7.4 раза медленнее оригинального протокола (5.5 Гбит/с). Это объясняется фундаментальными различиями используемых примитивов:
+
+\begin{itemize}
+    \item \textbf{Природа шифра:} \texttt{WireGuard} использует потоковый шифр \texttt{ChaCha20}, который выполняет минимальное количество операций над памятью (\texttt{XOR} с гаммой) и идеально оптимизирован для программной реализации. \texttt{WireGost} использует блочный шифр <<Кузнечик>> (ГОСТ Р 34.12-2015). Программная реализация блочного шифра требует выполнения ресурсоемких раундовых преобразований (S-box, линейное преобразование) для каждого блока данных (16 байт);
+    \item \textbf{Отсутствие SIMD-оптимизаций:} Оригинальный модуль \texttt{WireGuard} активно использует векторные инструкции процессора (AVX2/AVX-512) для параллельной обработки блоков. Текущая реализация \texttt{WireGost} выполнена на чистом Си без использования ассемблерных вставок, что оставляет значительный потенциал для оптимизации в будущем.
+\end{itemize}
+
+Тем не менее, достигнутая скорость в $\approx 750$ Мбит/с является достаточной для насыщения большинства каналов связи ($100$ Мбит/с и приближается к $1$ Гбит/с), что делает решение пригодным для практического использования.
+
+\nlparagraph{Сравнение \texttt{WireGost} с \texttt{ruWireGuard}}
+
+Сравнение с \texttt{ruWireGuard} наглядно демонстрирует неэффективность реализации высоконагруженных VPN-решений в пространстве пользователя (\texttt{userspace}) и использования языка программирования Go для тяжелых алгоритмов.
+\begin{itemize}
+    \item \textbf{Пропускная способность:} перенос кода в ядро позволил увеличить скорость в \textbf{12 раз} (с 61 до 743 Мбит/с);
+    \item \textbf{Стабильность UDP:} реализация на \texttt{Go} теряет более 98\% \texttt{UDP}-пакетов при нагрузочном тестировании. Это происходит из-за того, что планировщик ОС и сборщик мусора (\texttt{GC}) языка \texttt{Go} не успевают обрабатывать прерывания и переключать контекст (\texttt{Kernel} $\leftrightarrow$ \texttt{User}) с необходимой скоростью. Модуль ядра \texttt{WireGost} демонстрирует потери на уровне 13\%, что является приемлемым показателем при полной загрузке \texttt{CPU};
+    \item \textbf{Задержки:} задержка в \texttt{ruWireGuard} (441 мс) делает его непригодным для VoIP и интерактивных приложений. \texttt{WireGost} обеспечивает задержку менее 0.1 мс.
+\end{itemize}
+
+\nlparagraph{Парадокс низкой задержки}
+
+Интересно отметить, что задержка под нагрузкой (\texttt{Latency}) у \texttt{WireGost} (0.083 мс) оказалась даже ниже, чем у оригинального \texttt{WireGuard} (0.098 мс). Это явление возможно объясняется эффектом \textit{Bufferbloat}. Из-за сверхвысокой пропускной способности оригинального \texttt{WireGuard} сетевые буферы (\texttt{qdisc}) заполняются максимально плотно, создавая очереди. В случае с \texttt{WireGost} «узким местом» является \texttt{CPU}, а не сетевая очередь, поэтому пакеты, успевшие зашифроваться, отправляются в сеть практически мгновенно, не ожидая в переполненном буфере.\\
+
+С другой стороны, если данное предположение ошибочно, то отличия в задержке являются незначительными и их можно списать на погрешность измерений.
+
+\subsection{Выводы по главе}
+
+В ходе выполнения раздела автором была решена задача программной реализации протокола \texttt{WireGost} в виде загружаемого модуля ядра Linux.
+
+\begin{enumerate}
+    \item разработаны и интегрированы в подсистему \texttt{Crypto API} модули российских криптографических алгоритмов: хэш-функция <<Стрибог>> (с поддержкой \texttt{HMAC}), блочный шифр <<Кузнечик>> (в режиме \texttt{MGM}) и протокол выработки общего ключа \texttt{VKO} ГОСТ Р 34.10-2012;
+    \item модифицирована машина состояний протокола \texttt{Noise} и механизм рукопожатия для поддержки увеличенных размеров ключей (512 бит);
+    \item адаптирован интерфейс \texttt{Netlink} и разработана утилита \texttt{wg\_gost\_cli} для управления интерфейсом, так как стандартные утилиты несовместимы с новыми размерами ключей;
+    \item проведенное нагрузочное тестирование показало, что разработанное решение обеспечивает максимальную пропускную способность (по \texttt{UDP}) до \textbf{862 Мбит/с}, что в \textbf{20 раз} превосходит существующие аналоги в пространстве пользователя, обеспечивая при этом надежную защиту данных в соответствии с отечественными стандартами.
+\end{enumerate}
+
+Подтверждена корректность работы всех криптографических примитивов и протокола, в целом (тесты целостности файлов и успешное прохождение рукопожатий). В случае дальнейшей доработки разработанный модуль возможен для эксплуатации в средах с высокими требованиями к производительности.

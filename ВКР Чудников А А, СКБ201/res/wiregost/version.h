@@ -1,0 +1,1 @@
+#define WIREGOST_VERSION "0.5.7"

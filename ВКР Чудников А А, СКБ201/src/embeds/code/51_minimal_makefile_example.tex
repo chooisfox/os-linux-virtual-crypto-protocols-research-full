@@ -1,0 +1,13 @@
+\begin{minted}[tabsize=4]{Makefile}
+obj-m += my_module.o
+
+PWD := $(CURDIR)
+
+all:
+    $(MAKE) -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+
+clean:
+    $(MAKE) -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+\end{minted}
+
+~\cite{kernel_module_build}

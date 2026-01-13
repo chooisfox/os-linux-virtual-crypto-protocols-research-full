@@ -1,0 +1,68 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Copyright (C) 2025-2026 Chudnikov A. A. <admin@redline-software.xyz>. All Rights Reserved.
+ */
+#include "gost_streebog.h"
+
+#include <linux/err.h>
+#include <linux/module.h>
+#include <linux/slab.h>
+#include <linux/string.h>
+
+static struct crypto_shash *streebog_tfm;
+
+int gost_streebog_init_module(void)
+{
+	streebog_tfm = crypto_alloc_shash("streebog256", 0, 0);
+	if (IS_ERR(streebog_tfm))
+	{
+		pr_err("WireGost: failed to allocate streebog256: %ld\n", PTR_ERR(streebog_tfm));
+		return PTR_ERR(streebog_tfm);
+	}
+
+	if (crypto_shash_descsize(streebog_tfm) > GOST_STREEBOG_CTX_SIZE)
+	{
+		pr_err("WireGost: streebog context too large\n");
+		crypto_free_shash(streebog_tfm);
+		streebog_tfm = NULL;
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+void gost_streebog_cleanup_module(void)
+{
+	if (streebog_tfm)
+	{
+		crypto_free_shash(streebog_tfm);
+		streebog_tfm = NULL;
+	}
+}
+
+void gost_streebog256_init(struct gost_streebog_state *ctx)
+{
+	if (likely(streebog_tfm))
+	{
+		ctx->desc.tfm = streebog_tfm;
+		crypto_shash_init(&ctx->desc);
+	}
+}
+
+void gost_streebog256_update(struct gost_streebog_state *ctx, const u8 *data, size_t len)
+{
+	crypto_shash_update(&ctx->desc, data, len);
+}
+
+void gost_streebog256_final(struct gost_streebog_state *ctx, u8 *hash)
+{
+	crypto_shash_final(&ctx->desc, hash);
+}
+
+void gost_streebog256(u8 *out, const u8 *in, size_t len)
+{
+	struct gost_streebog_state ctx;
+	gost_streebog256_init(&ctx);
+	gost_streebog256_update(&ctx, in, len);
+	gost_streebog256_final(&ctx, out);
+	memzero_explicit(&ctx, sizeof(ctx));
+}

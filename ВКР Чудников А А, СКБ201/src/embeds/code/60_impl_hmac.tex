@@ -1,0 +1,45 @@
+\begin{minted}[tabsize=4]{c}
+void gost_hmac256(u8 *out, const u8 *in, size_t inlen,
+                  const u8 *key, size_t keylen)
+{
+    struct gost_streebog_state state;
+    u8 x_key[STREEBOG_BLOCK_SIZE];
+    u8 i_hash[STREEBOG256_DIGEST_SIZE];
+    u8 pad_key[STREEBOG_BLOCK_SIZE];
+    int i;
+
+    /* 1. Нормализация ключа до 64 байт */
+    if (keylen > STREEBOG_BLOCK_SIZE) {
+        gost_streebog256(x_key, key, keylen);
+        memset(x_key + STREEBOG256_DIGEST_SIZE, 0,
+               STREEBOG_BLOCK_SIZE - STREEBOG256_DIGEST_SIZE);
+    } else {
+        memcpy(x_key, key, keylen);
+        if (keylen < STREEBOG_BLOCK_SIZE)
+            memset(x_key + keylen, 0, STREEBOG_BLOCK_SIZE - keylen);
+    }
+
+    /* 2. inner_hash: H((K^ipad) || msg) */
+    for (i = 0; i < STREEBOG_BLOCK_SIZE; ++i)
+        pad_key[i] = x_key[i] ^ 0x36;
+
+    gost_streebog256_init(&state);
+    gost_streebog256_update(&state, pad_key, STREEBOG_BLOCK_SIZE);
+    gost_streebog256_update(&state, in, inlen);
+    gost_streebog256_final(&state, i_hash);
+
+    /* 3. outer_hash: H((K^opad) || inner_hash) */
+    for (i = 0; i < STREEBOG_BLOCK_SIZE; ++i)
+        pad_key[i] = x_key[i] ^ 0x5c;
+
+    gost_streebog256_init(&state);
+    gost_streebog256_update(&state, pad_key, STREEBOG_BLOCK_SIZE);
+    gost_streebog256_update(&state, i_hash, STREEBOG256_DIGEST_SIZE);
+    gost_streebog256_final(&state, out);
+
+    /* Очистка ключевой информации */
+    memzero_explicit(x_key, sizeof(x_key));
+    memzero_explicit(pad_key, sizeof(pad_key));
+    memzero_explicit(i_hash, sizeof(i_hash));
+}
+\end{minted}

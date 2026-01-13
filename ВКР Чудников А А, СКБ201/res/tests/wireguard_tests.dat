@@ -1,0 +1,129 @@
+Test 1
+=== Benchmark Summary: Standard WireGuard ===
+Protocol:       Standard WireGuard
+TCP Throughput: 5359.75 Mbps
+UDP Throughput: 3463.71 Mbps
+UDP Loss:       0.2566583057085597 %
+CPU Cost:       499.00
+Efficiency:     10.74
+PPS (64b UDP):  381161
+Integrity:      PASS
+Latency (Load): 0.056 ms
+
+Test 2
+=== Benchmark Summary: Standard WireGuard ===
+Protocol:       Standard WireGuard
+TCP Throughput: 5244.50 Mbps
+UDP Throughput: 3536.83 Mbps
+UDP Loss:       0.16870834028305443 %
+CPU Cost:       495.60
+Efficiency:     10.58
+PPS (64b UDP):  366215
+Integrity:      PASS
+Latency (Load): 0.081 ms
+
+Test 3
+=== Benchmark Summary: Standard WireGuard ===
+Protocol:       Standard WireGuard
+TCP Throughput: 5800.72 Mbps
+UDP Throughput: 3538.12 Mbps
+UDP Loss:       0.0800128564497038 %
+CPU Cost:       496.40
+Efficiency:     11.68
+PPS (64b UDP):  376578
+Integrity:      PASS
+Latency (Load): 0.058 ms
+
+Test 4
+=== Benchmark Summary: Standard WireGuard ===
+Protocol:       Standard WireGuard
+TCP Throughput: 5216.29 Mbps
+UDP Throughput: 3728.78 Mbps
+UDP Loss:       0.10630469517289905 %
+CPU Cost:       514.28
+Efficiency:     10.14
+PPS (64b UDP):  394420
+Integrity:      PASS
+Latency (Load): 0.093 ms
+
+Test 5
+=== Benchmark Summary: Standard WireGuard ===
+Protocol:       Standard WireGuard
+TCP Throughput: 5449.13 Mbps
+UDP Throughput: 3508.99 Mbps
+UDP Loss:       0.10962241169305725 %
+CPU Cost:       500.09
+Efficiency:     10.89
+PPS (64b UDP):  376871
+Integrity:      PASS
+Latency (Load): 0.079 ms
+
+Test 6
+=== Benchmark Summary: Standard WireGuard ===
+Protocol:       Standard WireGuard
+TCP Throughput: 5744.63 Mbps
+UDP Throughput: 3720.09 Mbps
+UDP Loss:       0.15976880514079625 %
+CPU Cost:       488.81
+Efficiency:     11.75
+PPS (64b UDP):  378006
+Integrity:      PASS
+Latency (Load): 0.110 ms
+
+Test 7
+=== Benchmark Summary: Standard WireGuard ===
+Protocol:       Standard WireGuard
+TCP Throughput: 5718.18 Mbps
+UDP Throughput: 2927.15 Mbps
+UDP Loss:       0.43061862577235166 %
+CPU Cost:       508.39
+Efficiency:     11.24
+PPS (64b UDP):  379964
+Integrity:      PASS
+Latency (Load): 0.079 ms
+
+Test 8
+=== Benchmark Summary: Standard WireGuard ===
+Protocol:       Standard WireGuard
+TCP Throughput: 5909.47 Mbps
+UDP Throughput: 3786.69 Mbps
+UDP Loss:       0.05790446485300064 %
+CPU Cost:       493.80
+Efficiency:     11.96
+PPS (64b UDP):  386138
+Integrity:      PASS
+Latency (Load): 0.098 ms
+
+Test 9
+=== Benchmark Summary: Standard WireGuard ===
+Protocol:       Standard WireGuard
+TCP Throughput: 5283.88 Mbps
+UDP Throughput: 3545.55 Mbps
+UDP Loss:       0.2789515312481727 %
+CPU Cost:       499.10
+Efficiency:     10.58
+PPS (64b UDP):  382873
+Integrity:      PASS
+Latency (Load): 0.114 ms
+
+Test 10
+=== Benchmark Summary: Standard WireGuard ===
+Protocol:       Standard WireGuard
+TCP Throughput: 5309.54 Mbps
+UDP Throughput: 3775.22 Mbps
+UDP Loss:       0.0658409273924907 %
+CPU Cost:       495.00
+Efficiency:     10.72
+PPS (64b UDP):  385391
+Integrity:      PASS
+Latency (Load): 0.065 ms
+
+=== Average Results (Processed 10 tests) ===
+Protocol:       Standard WireGuard (Averaged)
+TCP Throughput: 5503.61 Mbps
+UDP Throughput: 3553.11 Mbps
+UDP Loss:       0.1714 %
+CPU Cost:       499.05
+Efficiency:     11.03
+PPS (64b UDP):  380762
+Latency (Load): 0.083 ms

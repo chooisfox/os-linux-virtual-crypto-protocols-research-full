@@ -1,0 +1,129 @@
+Test 1
+=== Benchmark Summary: ruWireGuard-Go ===
+Protocol:       ruWireGuard-Go
+TCP Throughput: 74.61 Mbps
+UDP Throughput: 41.46 Mbps
+UDP Loss:       98.50821102186715 %
+CPU Cost:       1377.88
+Efficiency:     .05
+PPS (64b UDP):  413739
+Integrity:      PASS
+Latency (Load): 503.339 ms
+
+Test 2
+=== Benchmark Summary: ruWireGuard-Go ===
+Protocol:       ruWireGuard-Go
+TCP Throughput: 75.85 Mbps
+UDP Throughput: 40.18 Mbps
+UDP Loss:       98.5637031907129 %
+CPU Cost:       1397.01
+Efficiency:     .05
+PPS (64b UDP):  395234
+Integrity:      PASS
+Latency (Load): 427.762 ms
+
+Test 3
+=== Benchmark Summary: ruWireGuard-Go ===
+Protocol:       ruWireGuard-Go
+TCP Throughput: 43.53 Mbps
+UDP Throughput: 35.16 Mbps
+UDP Loss:       98.04907832438764 %
+CPU Cost:       1463.81
+Efficiency:     .02
+PPS (64b UDP):  303798
+Integrity:      PASS
+Latency (Load): 483.722 ms
+
+Test 4
+=== Benchmark Summary: ruWireGuard-Go ===
+Protocol:       ruWireGuard-Go
+TCP Throughput: 53.69 Mbps
+UDP Throughput: 41.63 Mbps
+UDP Loss:       98.5425067173591 %
+CPU Cost:       1437.71
+Efficiency:     .03
+PPS (64b UDP):  397066
+Integrity:      PASS
+Latency (Load): 524.133 ms
+
+Test 5
+=== Benchmark Summary: ruWireGuard-Go ===
+Protocol:       ruWireGuard-Go
+TCP Throughput: 63.97 Mbps
+UDP Throughput: 41.78 Mbps
+UDP Loss:       98.5415380393771 %
+CPU Cost:       1402.78
+Efficiency:     .04
+PPS (64b UDP):  422890
+Integrity:      PASS
+Latency (Load): 377.205 ms
+
+Test 6
+=== Benchmark Summary: ruWireGuard-Go ===
+Protocol:       ruWireGuard-Go
+TCP Throughput: 57.45 Mbps
+UDP Throughput: 42.06 Mbps
+UDP Loss:       98.67177574432444 %
+CPU Cost:       1417.89
+Efficiency:     .04
+PPS (64b UDP):  413420
+Integrity:      PASS
+Latency (Load): 378.850 ms
+
+Test 7
+=== Benchmark Summary: ruWireGuard-Go ===
+Protocol:       ruWireGuard-Go
+TCP Throughput: 52.50 Mbps
+UDP Throughput: 35.39 Mbps
+UDP Loss:       98.5812227677394 %
+CPU Cost:       1434.92
+Efficiency:     .03
+PPS (64b UDP):  327828
+Integrity:      PASS
+Latency (Load): 561.329 ms
+
+Test 8
+=== Benchmark Summary: ruWireGuard-Go ===
+Protocol:       ruWireGuard-Go
+TCP Throughput: 79.26 Mbps
+UDP Throughput: 52.00 Mbps
+UDP Loss:       98.83196401458714 %
+CPU Cost:       1364.60
+Efficiency:     .05
+PPS (64b UDP):  325021
+Integrity:      PASS
+Latency (Load): 167.082 ms
+
+Test 9
+=== Benchmark Summary: ruWireGuard-Go ===
+Protocol:       ruWireGuard-Go
+TCP Throughput: 63.17 Mbps
+UDP Throughput: 34.74 Mbps
+UDP Loss:       98.6329159446824 %
+CPU Cost:       1411.63
+Efficiency:     .04
+PPS (64b UDP):  305120
+Integrity:      PASS
+Latency (Load): 458.437 ms
+
+Test 10
+=== Benchmark Summary: ruWireGuard-Go ===
+Protocol:       ruWireGuard-Go
+TCP Throughput: 51.40 Mbps
+UDP Throughput: 35.31 Mbps
+UDP Loss:       98.272224682254 %
+CPU Cost:       1437.97
+Efficiency:     .03
+PPS (64b UDP):  331206
+Integrity:      PASS
+Latency (Load): 533.356 ms
+
+=== Average Results (Processed 10 tests) ===
+Protocol:       Standard WireGuard (Averaged)
+TCP Throughput: 61.54 Mbps
+UDP Throughput: 39.97 Mbps
+UDP Loss:       98.5195 %
+CPU Cost:       1414.62
+Efficiency:     0.04
+PPS (64b UDP):  363532
+Latency (Load): 441.522 ms

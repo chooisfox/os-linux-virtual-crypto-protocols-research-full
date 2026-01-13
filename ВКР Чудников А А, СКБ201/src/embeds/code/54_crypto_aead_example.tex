@@ -1,0 +1,33 @@
+\begin{minted}[tabsize=4]{c}
+#include <crypto/aead.h>
+
+static int aead_setkey(struct crypto_aead *tfm, const u8 key,
+unsigned int keylen) { /* */ return 0; }
+static int aead_encrypt(struct aead_request req) { /* */ return 0; }
+static int aead_decrypt(struct aead_request req) { /* */ return 0; }
+
+static struct aead_alg alg = {
+    .setkey = aead_setkey,
+    .encrypt = aead_encrypt,
+    .decrypt = aead_decrypt,
+    .ivsize = 16,
+    .maxauthsize = 16,
+    .base = {
+        .cra_name = "aead",
+        .cra_driver_name= "aead-generic",
+        .cra_blocksize = 1,
+        .cra_ctxsize = sizeof(struct aead_ctx),
+        .cra_module = THIS_MODULE,
+    }
+};
+
+static int __init aead_mod_init(void)
+{
+return crypto_register_aead(&alg);
+}
+
+static void __exit aead_mod_exit(void)
+{
+crypto_unregister_aead(&alg);
+}
+\end{minted}

@@ -1,0 +1,32 @@
+\begin{minted}[tabsize=4]{c}
+#include <crypto/kpp.h>
+
+static int kpp_set_secret(struct crypto_kpp *tfm, const void key,
+unsigned int keylen) { /* */ return 0; }
+static int kpp_gen_pubkey(struct kpp_request req) { /* */ return 0; }
+static int kpp_compute_ss(struct kpp_request req) { /* */ return 0; }
+static unsigned int kpp_max_size(struct crypto_kpp *tfm) { return 32; }
+
+static struct kpp_alg alg = {
+    .set_secret = kpp_set_secret,
+    .generate_public_key = kpp_gen_pubkey,
+    .compute_shared_secret = kpp_compute_ss,
+    .max_size = kpp_max_size,
+    .base = {
+        .cra_name = "kpp",
+        .cra_driver_name= "kpp-generic",
+        .cra_ctxsize = sizeof(struct kpp_ctx),
+        .cra_module = THIS_MODULE,
+    }
+};
+
+static int __init kpp_mod_init(void)
+{
+return crypto_register_kpp(&alg);
+}
+
+static void __exit kpp_mod_exit(void)
+{
+crypto_unregister_kpp(&alg);
+}
+\end{minted}

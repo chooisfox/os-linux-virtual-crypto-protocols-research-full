@@ -1,0 +1,74 @@
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=0.1cm,
+    % Стиль для уровней OSI
+    osi_layer/.style={
+        draw,
+        rectangle,
+        thick,
+        minimum width=8cm,
+        minimum height=1.3cm,
+        text centered,
+        font=\sffamily
+    },
+    % Стиль для уровней TCP/IP
+    tcp_layer/.style={
+        draw,
+        rectangle,
+        thick,
+        minimum width=6cm,
+        text centered,
+        font=\sffamily,
+        fill=teal!20
+    }
+]
+
+\node (L7) [osi_layer, fill=red!20]                 {\textbf{7. Прикладной уровень}};
+\node (L6) [osi_layer, fill=orange!20, below=of L7] {\textbf{6. Уровень представления}};
+\node (L5) [osi_layer, fill=yellow!20, below=of L6] {\textbf{5. Сеансовый уровень}};
+\node (L4) [osi_layer, fill=green!20, below=of L5]  {\textbf{4. Транспортный уровень}};
+\node (L3) [osi_layer, fill=cyan!20, below=of L4]   {\textbf{3. Сетевой уровень}};
+\node (L2) [osi_layer, fill=blue!20, below=of L3]   {\textbf{2. Канальный уровень}};
+\node (L1) [osi_layer, fill=violet!20, below=of L2] {\textbf{1. Физический уровень}};
+
+\node (osi_label) [font=\sffamily\bfseries, above=0.0cm of L7.north] {Модель OSI};
+
+\node (T4) [tcp_layer,
+    minimum height = 3*1.3cm + 2*0.1cm,
+    right=2.5cm of L6]
+    {\textbf{Прикладной уровень}};
+
+\node (T3) [tcp_layer,
+    minimum height = 1.3cm,
+    right=2.5cm of L4]
+    {\textbf{Транспортный уровень}};
+
+\node (T2) [tcp_layer,
+    minimum height = 1.3cm,
+    right=2.5cm of L3]
+    {\textbf{Сетевой уровень}};
+
+\node (T1) [tcp_layer,
+    minimum height = 2*1.3cm + 1*0.1cm,
+    below=0.1cm of T2.south]
+    {\textbf{Канальный уровень}};
+
+\node[font=\sffamily\bfseries, above=0.0cm of T4.north] {Модель TCP/IP};
+
+\draw[dashed, gray, thick] (L7.north east) -- (T4.north west);
+\draw[dashed, gray, thick] (L5.south east) -- (T4.south west);
+
+\draw[dashed, gray, thick] (L4.north east) -- (T3.north west);
+\draw[dashed, gray, thick] (L4.south east) -- (T3.south west);
+
+\draw[dashed, gray, thick] (L3.north east) -- (T2.north west);
+\draw[dashed, gray, thick] (L3.south east) -- (T2.south west);
+
+\draw[dashed, gray, thick] (L2.north east) -- (T1.north west);
+\draw[dashed, gray, thick] (L1.south east) -- (T1.south west);
+
+\end{tikzpicture}
+\caption{Сравнение моделей OSI и TCP/IP}
+\label{fig:osi_vs_tcpip}
+\end{figure}

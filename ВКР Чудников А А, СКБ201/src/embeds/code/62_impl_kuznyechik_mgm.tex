@@ -1,0 +1,75 @@
+\begin{minted}[tabsize=4]{c}
+/* Макрос для оптимизированного преобразования LSX с использованием T-таблиц.
+ * Выполняет XOR результатов выборки из 16 таблиц (по одной на каждый байт).
+ */
+static __always_inline void LSX(u8 *a, const u8 *b, const u8 *c)
+{
+    u64 r0, r1;
+    const u64 *t;
+
+    /* Инициализация первой итерации (байт 0) */
+    t  = (const u64 *)&kuz_table[0][(b[0] ^ c[0]) * 16];
+    r0 = t[0];
+    r1 = t[1];
+
+    /* Развернутый цикл XOR для оставшихся 15 байт */
+#define LSX_XOR(i) \
+    t = (const u64 *)&kuz_table[i][(b[i] ^ c[i]) * 16]; \
+    r0 ^= t[0]; \
+    r1 ^= t[1];
+
+    LSX_XOR(1);  LSX_XOR(2);  LSX_XOR(3);  LSX_XOR(4);
+    LSX_XOR(5);  LSX_XOR(6);  LSX_XOR(7);  LSX_XOR(8);
+    LSX_XOR(9);  LSX_XOR(10); LSX_XOR(11); LSX_XOR(12);
+    LSX_XOR(13); LSX_XOR(14); LSX_XOR(15);
+
+    /* Сохранение результата в выходной буфер как u64 (оптимизация) */
+    ((u64 *)a)[0] = r0;
+    ((u64 *)a)[1] = r1;
+#undef LSX_XOR
+}
+
+/* Функция шифрования одного блока (ECB).
+ * Использует предварительно развернутые ключи и макрос LSX.
+ */
+static void kuznyechik_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
+{
+    const struct crypto_kuznyechik_ctx *ctx = crypto_tfm_ctx(tfm);
+    const u64 *keys = (const u64 *)ctx->key;
+    u8 temp[KUZNYECHIK_BLOCK_SIZE] __aligned(sizeof(u64));
+    u64 *o = (u64 *)out;
+    u64 *t = (u64 *)temp;
+
+    /* 9 раундов преобразований LSX */
+    LSX(temp, (u8 *)(keys + 0), in);    /* Раунд 1 */
+    LSX(temp, (u8 *)(keys + 2), temp);  /* Раунд 2 */
+    LSX(temp, (u8 *)(keys + 4), temp);  /* Раунд 3 */
+    /* ... */
+    LSX(temp, (u8 *)(keys + 16), temp); /* Раунд 9 */
+
+    /* Последний раунд: только сложение с ключом (X-преобразование) */
+    o[0] = t[0] ^ keys[18];
+    o[1] = t[1] ^ keys[19];
+}
+
+/* Быстрое обновление тега аутентификации MGM.
+ * Использует встроенную функцию ядра для умножения в поле Галуа.
+ */
+static inline void mgm_mul_add_tag_fast(be128 *tag, const u8 *data,
+                                        const be128 *h_i)
+{
+    be128 d_block;
+    /* Оптимизация: чтение 64-битными словами, обработка невыровненных данных */
+    const u64 *dp = (const u64 *)data;
+    u64 *tp = (u64 *)&d_block;
+
+    tp[0] = get_unaligned(&dp[0]);
+    tp[1] = get_unaligned(&dp[1]);
+
+    /* Аппаратно-оптимизированное умножение: d_block = d_block * h_i in GF(2^128) */
+    gf128mul_x_bbe(&d_block, h_i);
+
+    /* Аккумуляция результата в тег (XOR) */
+    kuz_be128_xor(tag, tag, &d_block);
+}
+\end{minted}

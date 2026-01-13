@@ -1,0 +1,80 @@
+\begin{sloppypar}
+\begin{abstract}
+
+\noindent\textbf{Тема:}
+Исследование реализации виртуальных криптографических сетевых интерфейсов в ядре ОС Linux.
+
+\vspace{\baselineskip}
+
+\noindent\textbf{Цель работы:}
+Целью работы является исследование механизмов ядра семейства операционной системы \texttt{Linux} с целью последующей реализации виртуальных сетевых интерфейсов на базе криптографических протоколов, описанных в государственных стандартах (ГОСТ).
+
+\vspace{\baselineskip}
+
+\noindent\textbf{Поставленные задачи:}
+\begin{itemize}
+    \item исследование методов реализации виртуальных сетевых интерфейсов в ядре Linux;
+    \item анализ криптографической подсистемы ядра <<\texttt{Crypto API}>> на возможность встраивания криптографических протоколов, описанных в ГОСТ;
+    \item изучение существующих виртуальных сетевых интерфейсов;
+    \item выбор оптимального набора криптографических протоколов;
+    \item разработка и тестирование прототипа виртуального криптоинтерфейса.
+\end{itemize}
+
+\vspace{\baselineskip}
+
+\noindent\textbf{Полученные результаты:}
+В ходе выполнения работы было принято решение об использовании \texttt{WireGuard} в качестве основы для встраивания криптографических протоколов, описанных в ГОСТ.
+Был успешно разработан набор базовых криптографических примитивов в виде загружаемых модулей ядра (\texttt{LKM}) с использованием \texttt{Crypto API}.
+На базе архитектуры \texttt{WireGuard} разработан модуль \texttt{WireGost}, использующий отечественные криптографические алгоритмы. \\
+
+
+\noindent Тестирование показало, что \texttt{WireGost} способен работать на скоростях вплоть до \textbf{900 Мбит/с}. Это подтверждает преимущество реализации в ядре перед решениями в пространстве пользователя, тем не менее уступает оригинальному \texttt{WireGuard}. Наиболее медленной частью системы стал блочный шифр <<Кузнечик>>, который, по сравнению с <<\texttt{ChaCha20}>>, используемым в оригинальном протоколе, является гораздо более дорогим с точки зрения вычислительной сложности.
+
+\vspace{\baselineskip}
+
+\noindent\textbf{Предложенные рекомендации:}
+Для повышения производительности разработанного решения и приближения его показателей к скорости физического канала рекомендуется пересмотреть методы реализации блочного шифра <<Кузнечик>> в виде загружаемых модулей ядра, а также обеспечить более эффективную поддержку базовых математических операций используемых в ГОСТ.
+
+\end{abstract}
+
+\newpage
+
+\begin{otherlanguage}{english}
+\begin{abstract}
+\noindent\textbf{Topic:}
+Research on the implementation of virtual cryptographic network interfaces in the Linux OS kernel.
+
+\vspace{\baselineskip}
+
+\noindent\textbf{Purpose:}
+The purpose of the work is to study the mechanisms of the Linux operating system family kernel with the aim of the subsequent implementation of virtual network interfaces based on cryptographic protocols described in state standards (GOST).
+
+\vspace{\baselineskip}
+
+\noindent\textbf{Tasks:}
+\begin{itemize}
+    \item research of methods for implementing virtual network interfaces in the Linux kernel;
+    \item analysis of the kernel cryptographic subsystem ``\texttt{Crypto API}'' regarding the possibility of embedding cryptographic protocols described in GOST;
+    \item study of existing virtual network interfaces;
+    \item selection of an optimal set of cryptographic protocols;
+    \item development and testing of a virtual crypto-interface prototype.
+\end{itemize}
+
+\vspace{\baselineskip}
+
+\noindent\textbf{Results:}
+While carrying out the research the author decided to use \texttt{WireGuard} as a basis for embedding cryptographic protocols described in GOST.
+A set of basic cryptographic primitives was successfully developed in the form of Loadable Kernel Modules (\texttt{LKM}) using the \texttt{Crypto API}.
+Based on the \texttt{WireGuard} architecture, the \texttt{WireGost} module was developed using domestic cryptographic algorithms. \\
+
+\noindent Testing showed that \texttt{WireGost} is capable of operating at speeds up to \textbf{900 Mbps}. This confirms the advantage of in-kernel implementation over user-space solutions; nevertheless, it yields to the original \texttt{WireGuard}. The slowest part of the system proved to be the ``Kuznyechik'' block cipher, which, compared to ``\texttt{ChaCha20}'' used in the original protocol, is much more expensive in terms of computational complexity.
+
+\vspace{\baselineskip}
+
+\noindent\textbf{Recommendations:}
+To improve the performance of the developed solution and bring its metrics closer to the physical link speed, it is recommended to revise the implementation methods of the ``Kuznyechik'' block cipher in the form of loadable kernel modules, as well as to ensure more efficient support for basic mathematical operations used in GOST.
+\end{abstract}
+\end{otherlanguage}
+\end{sloppypar}
+
+\newpage

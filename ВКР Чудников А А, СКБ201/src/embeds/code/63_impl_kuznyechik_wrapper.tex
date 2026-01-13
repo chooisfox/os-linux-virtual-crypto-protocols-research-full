@@ -1,0 +1,70 @@
+\begin{minted}[tabsize=4]{c}
+/* Вспомогательная функция для выполнения операций AEAD.
+ * Инкапсулирует работу со структурами ядра scatterlist и aead_request.
+ */
+static int do_aead_op(struct crypto_aead *tfm, u8 *dst, const u8 *src, size_t len,
+                      const u8 *ad, size_t ad_len, const u8 *nonce, bool encrypt)
+{
+    struct aead_request *req;
+    struct scatterlist sg_src[2], sg_dst[2];
+    int ret;
+
+    /*
+     * Так как WireGuard обрабатывает пакеты в контексте SoftIRQ.
+     * Использование GFP_KERNEL здесь привело бы к "sleep inside atomic section".
+     * Поэтому обязательно используем GFP_ATOMIC.
+     */
+    req = aead_request_alloc(tfm, GFP_ATOMIC);
+    if (!req)
+        return -ENOMEM;
+
+    /*
+     * Формирование цепочек scatterlist (SG).
+     * API ядра требует, чтобы ассоциированные данные (AD) шли перед
+     * шифруемыми данными в виртуальном представлении памяти.
+     */
+    if (ad_len > 0) {
+        /* Формируем входной SG: [AD] -> [SRC] */
+        sg_init_table(sg_src, 2);
+        sg_set_buf(&sg_src[0], ad, ad_len);
+        sg_set_buf(&sg_src[1], src, len);
+
+        /* Формируем выходной SG: [AD] -> [DST] */
+        sg_init_table(sg_dst, 2);
+        sg_set_buf(&sg_dst[0], ad, ad_len);
+        /* При шифровании выходной буфер должен вмещать данные + тег (16 байт) */
+        sg_set_buf(&sg_dst[1], dst, len + (encrypt ? KUZNYECHIK_MGM_TAG_SIZE : 0));
+
+        aead_request_set_crypt(req, sg_src, sg_dst, len, (u8 *)nonce);
+        aead_request_set_ad(req, ad_len);
+    } else {
+        /* Упрощенный случай без AD (линейное отображение) */
+        sg_init_one(sg_src, src, len);
+        sg_init_one(sg_dst, dst, len + (encrypt ? KUZNYECHIK_MGM_TAG_SIZE : 0));
+
+        aead_request_set_crypt(req, sg_src, sg_dst, len, (u8 *)nonce);
+        aead_request_set_ad(req, 0);
+    }
+
+    /* Выполняем операцию. В данном случае вызов синхронный,
+     * так как используется программная реализация шифра.
+     */
+    if (encrypt)
+        ret = crypto_aead_encrypt(req);
+    else
+        ret = crypto_aead_decrypt(req);
+
+    aead_request_free(req);
+    return ret;
+}
+
+/* Публичный интерфейс для шифрования, используемый в send.c */
+int gost_kuznyechik_mgm_encrypt(struct gost_kuznyechik_mgm_ctx *ctx,
+                                u8 *dst, const u8 *src, size_t src_len,
+                                const u8 *ad, size_t ad_len, const u8 *nonce)
+{
+    if (unlikely(!ctx->tfm))
+        return -EINVAL;
+    return do_aead_op(ctx->tfm, dst, src, src_len, ad, ad_len, nonce, true);
+}
+\end{minted}

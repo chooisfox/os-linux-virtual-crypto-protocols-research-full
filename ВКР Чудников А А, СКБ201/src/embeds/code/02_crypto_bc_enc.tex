@@ -1,0 +1,11 @@
+\begin{minted}{c}
+static void xor_cipher_crypt(struct crypto_tfm *tfm, u8 *dst, const u8 *src)
+{
+    struct xor_cipher_ctx *ctx = crypto_tfm_ctx(tfm);
+    int i;
+    for (i = 0; i < XOR_CIPHER_BLOCK_SIZE; i++)
+        {
+        dst[i] = src[i] ^ ctx->key[i];
+    }
+}
+\end{minted}

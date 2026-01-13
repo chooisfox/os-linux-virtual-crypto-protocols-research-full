@@ -1,0 +1,15 @@
+\begin{minted}{c}
+struct nlmsghdr {
+    __u32   nlmsg_len;      /* Длина сообщения включая заголовки */
+    __u16   nlmsg_type;     /* ID семейства Generic Netlink */
+    __u16   nlmsg_flags;    /* Флаги запроса или дампа */
+    __u32   nlmsg_seq;      /* Порядковый номер */
+    __u32   nlmsg_pid;      /* Идентификатор порта отправителя */
+};
+struct genlmsghdr {
+    __u8 cmd;           /* Команда для данного семейства */
+    __u8 version;       /* Версия API */
+    __u16 reserved;     /* Зарезервировано */
+};
+/* Далее следуют TLV-атрибуты... */
+\end{minted}

@@ -1,0 +1,41 @@
+\begin{minted}{c}
+static int xor_cbc_encrypt(struct skcipher_request *req)
+{
+    struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
+    struct xor_cipher_ctx *ctx = crypto_skcipher_ctx(tfm);
+    struct skcipher_walk walk;
+    
+    u8 *iv = req->iv;
+    
+    int err;
+    err = skcipher_walk_virt(&walk, req, false);
+    
+    while (walk.nbytes > 0) 
+    {
+        unsigned int nbytes = walk.nbytes;
+        const u8 *src = walk.src.virt.addr;
+        u8 *dst = walk.dst.virt.addr;
+    
+        // Реализация логики CBC для данного участка
+        for (; nbytes >= XOR_CIPHER_BLOCK_SIZE; 
+               nbytes -= XOR_CIPHER_BLOCK_SIZE) 
+        {
+            crypto_xor(dst, src, iv, XOR_CIPHER_BLOCK_SIZE); 
+            xor_cipher_crypt(crypto_skcipher_tfm(tfm), dst, dst); 
+            iv = dst;
+            src += XOR_CIPHER_BLOCK_SIZE;
+            dst += XOR_CIPHER_BLOCK_SIZE;
+        }
+    
+        // Обработка последнего неполного блока (если требуется)
+        if (nbytes > 0) 
+        {
+            // ...
+        }
+        
+        // Переход к следующему участку данных
+        err = skcipher_walk_done(&walk, err);
+    }
+    return err;    
+}
+\end{minted}

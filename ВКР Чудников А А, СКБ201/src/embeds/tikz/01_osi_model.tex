@@ -1,0 +1,48 @@
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=0.1cm,
+    layer/.style={
+        draw,
+        rectangle,
+        thick,
+        minimum width=8cm,
+        minimum height=1.3cm,
+        text centered,
+        font=\sffamily
+    },
+    pdu/.style={
+        font=\sffamily\small\itshape,
+        text=gray
+    },
+    desc/.style={
+        font=\sffamily\small,
+        align=left
+    },
+    arrow/.style={
+        -latex,
+        ultra thick
+    }
+]
+
+\node (L7) [layer, fill=red!20]                 {\textbf{7. Прикладной уровень}};
+\node (L6) [layer, fill=orange!20, below=of L7] {\textbf{6. Уровень представления}};
+\node (L5) [layer, fill=yellow!20, below=of L6] {\textbf{5. Сеансовый уровень}};
+\node (L4) [layer, fill=green!20, below=of L5]  {\textbf{4. Транспортный уровень}};
+\node (L3) [layer, fill=cyan!20, below=of L4]   {\textbf{3. Сетевой уровень}};
+\node (L2) [layer, fill=blue!20, below=of L3]   {\textbf{2. Канальный уровень}};
+\node (L1) [layer, fill=violet!20, below=of L2] {\textbf{1. Физический уровень}};
+
+%\node[desc, right=0.5cm of L7] {Пользовательские данные \\ \textit{(HTTP, FTP, SMTP, DNS)}};
+%\node[desc, right=0.5cm of L6] {Представление и кодирование данных \\ \textit{(SSL/TLS, ASCII, JPEG)}};
+%\node[desc, right=0.5cm of L5] {Управление сеансом связи \\ \textit{(NetBIOS, RPC)}};
+%\node[desc, right=0.5cm of L4] {\textbf{Сегменты / Дейтаграммы} \\ \textit{(TCP, UDP)}};
+%\node[desc, right=0.5cm of L3] {\textbf{Пакеты} \\ \textit{(IP, ICMP, IGMP)}};
+%\node[desc, right=0.5cm of L2] {\textbf{Кадры (фреймы)} \\ \textit{(Ethernet, Wi-Fi, MAC-адрес)}};
+%\node[desc, right=0.5cm of L1] {\textbf{Биты} \\ \textit{(Кабель, оптоволокно, радиосигнал)}};
+
+
+\end{tikzpicture}
+\caption{Схема семиуровневой модели OSI}
+\label{fig:osi_model}
+\end{figure}

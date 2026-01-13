@@ -1,0 +1,23 @@
+\begin{minted}{c}
+#define XOR_CIPHER_KEY_SIZE 16
+#define XOR_CIPHER_BLOCK_SIZE 16
+
+struct xor_cipher_ctx {
+    u8 key[XOR_CIPHER_KEY_SIZE];
+};
+
+static int xor_cipher_setkey(struct crypto_tfm *tfm, const u8 *key,
+unsigned int keylen)
+{
+    struct xor_cipher_ctx *ctx = crypto_tfm_ctx(tfm);
+
+    if (keylen != XOR_CIPHER_KEY_SIZE)
+    {
+        tfm->crt_flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
+        return -EINVAL;
+    }
+
+    memcpy(ctx->key, key, XOR_CIPHER_KEY_SIZE);
+    return 0;
+}
+\end{minted}

@@ -1,0 +1,106 @@
+\begin{luacode*}
+function print_code_appendix(rel_path, extensions_str, show_filename, base_label, show_tree, specific_files_str)
+    local pwd_handle = io.popen("pwd")
+    if not pwd_handle then return end
+    local pwd = pwd_handle:read("*a"):gsub("\n", "")
+    pwd_handle:close()
+
+    if show_tree == "true" then
+        local tree_cmd = "cd " .. rel_path .. " && find . -maxdepth 5 | sort"
+        local tree_handle = io.popen(tree_cmd)
+        if tree_handle then
+            tex.print("\\subsection*{Структура проекта}")
+            tex.print("\\dirtree{%")
+            for path in tree_handle:lines() do
+                local _, depth = path:gsub("/", "/")
+                depth = depth + 1
+                local name = path:match("([^/]+)$")
+                if path == "." then name = "/" end
+                if name then
+                    local safe_name = name:gsub("_", "\\_")
+                    tex.print(string.format(".%d %s .", depth, safe_name))
+                end
+            end
+            tex.print("}")
+            tex.print("\\clearpage")
+            tree_handle:close()
+        end
+    end
+
+    local allowed_exts = {}
+    if extensions_str then
+        for ext in string.gmatch(extensions_str, "([^,]+)") do
+            ext = ext:gsub("%s+", "")
+            allowed_exts[ext] = true
+        end
+    end
+
+    local allowed_files = {}
+    if specific_files_str then
+        for f in string.gmatch(specific_files_str, "([^,]+)") do
+            f = f:gsub("^%s*(.-)%s*$", "%1")
+            allowed_files[f] = true
+        end
+    end
+
+    local cmd = 'find ' .. rel_path .. ' -type f | sort'
+    local handle = io.popen(cmd)
+
+    if handle then
+        for filepath in handle:lines() do
+            local filename = filepath:match("([^/]+)$")
+            local ext = filename:match("^.+(%..+)$")
+            if ext then ext = ext:sub(2) end
+
+            local is_allowed_ext = (ext and allowed_exts[ext])
+            local is_specifically_included = (filename and allowed_files[filename])
+
+            if is_allowed_ext or is_specifically_included then
+                local safe_filename = filename:gsub("_", "\\_")
+                local abs_path = pwd .. "/" .. filepath
+
+                local file_label = ""
+                if base_label and base_label ~= "" then
+                    file_label = string.format("\\label{%s:%s}", base_label, filename)
+                end
+
+                if show_filename == "true" then
+                    tex.print("\\vspace{1em}")
+                    tex.print("\\phantomsection")
+                    tex.print(file_label)
+                    tex.print(string.format("\\noindent\\textbf{Файл: %s}", safe_filename))
+                    tex.print("\\vspace{0.5em}")
+                else
+                    tex.print("\\phantomsection" .. file_label)
+                end
+
+                local lang = "text"
+                if filename == "Makefile" then lang = "make"
+                elseif filename == "CMakeLists.txt" then lang = "cmake"
+                elseif filename == "Dockerfile" then lang = "dockerfile"
+                elseif ext == "c" or ext == "h" then lang = "c"
+                elseif ext == "cpp" or ext == "hpp" or ext == "cc" then lang = "cpp"
+                elseif ext == "py" then lang = "python"
+                elseif ext == "lua" then lang = "lua"
+                elseif ext == "sh" then lang = "bash"
+                elseif ext == "json" then lang = "json"
+                elseif ext == "xml" then lang = "xml"
+                elseif ext == "yaml" or ext == "yml" then lang = "yaml"
+                elseif ext == "tex" then lang = "latex"
+                elseif ext == "md" then lang = "markdown"
+                elseif ext == "js" then lang = "javascript"
+                elseif ext == "ts" then lang = "typescript"
+                elseif ext == "go" then lang = "go"
+                elseif ext == "rs" then lang = "rust"
+                end
+
+                tex.print(string.format(
+                    "\\inputminted[fontsize=\\footnotesize, linenos, breaklines, frame=single, framesep=2mm, tabsize=4]{%s}{%s}",
+                    lang, abs_path
+                ))
+            end
+        end
+        handle:close()
+    end
+end
+\end{luacode*}

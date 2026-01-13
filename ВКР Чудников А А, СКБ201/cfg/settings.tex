@@ -1,0 +1,90 @@
+\hypersetup{pdfpagemode=UseOutlines}
+
+\usetikzlibrary{positioning, shapes, arrows.meta, calc, fit}
+
+% Set default geometry
+\geometry{
+  paper=a4paper,
+  left=30mm,
+  right=15mm,
+  top=20mm,
+  bottom=20mm
+}
+
+\newcounter{gostappendix}
+
+% Define the Russian date format
+\DTMsetstyle{russian}
+\setdefaultlanguage{russian}
+\setotherlanguage{english}
+
+% Set the main font and Cyrillic font
+\setmainfont{Times New Roman}[Size=14pt]
+\setsansfont{Times New Roman}[Size=14pt]
+\setmonofont{Liberation Mono}[Size=12pt, Scale=0.85]
+
+% Set spacing
+\onehalfspacing
+
+% Set title format
+\titleformat{\section}
+    {\normalfont\bfseries\fontsize{18}{22}\selectfont}
+    {\thesection} {1em} {}
+
+\titlespacing*{\section}{0pt}{3.5ex plus 1ex minus .2ex}{2.3ex plus .2ex}
+
+\titleformat{\subsection}
+    {\normalfont\bfseries\fontsize{16}{20}\selectfont}
+    {\thesubsection} {1em} {}
+
+% Minted listings
+\tcbuselibrary{listings, minted, skins, breakable}
+
+\tcbset{listing engine=minted}
+\usemintedstyle{solarized-light}
+\setmintedinline{fontsize=\small}
+\setminted{fontsize=\small}
+
+\lstset { %
+    backgroundcolor=\color{white},
+    basicstyle=\rmfamily,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    commentstyle=\color{green},
+    extendedchars=true,
+    frame=single,
+    keepspaces=true,
+    keywordstyle=\color{blue},
+    language=c++,
+    numbers=none,
+    numbersep=5pt,
+    numberstyle=\tiny\color{blue},
+    rulecolor=\color{gray},
+    showspaces=false,
+    showtabs=false,
+    stepnumber=5,
+    stringstyle=\color{green},
+    tabsize=4,
+    title=\lstname
+}
+
+\definecolor{bgcolor}{HTML}{161615}
+\definecolor{fgcolor}{HTML}{232320}
+\definecolor{hgcolor}{HTML}{DC5A26}
+
+\definecolor{clcolor}{HTML}{FF605C}
+\definecolor{micolor}{HTML}{FFBD44}
+\definecolor{macolor}{HTML}{00CA4E}
+
+\tcbuselibrary{listingsutf8}
+
+\renewcommand{\lstlistingname}{Листинг}
+
+\lstset{
+  basicstyle=\small\ttfamily,
+  frame=single,
+  captionpos=b,
+}
+
+\addbibresource{res/biblatex/bibliography.bib}

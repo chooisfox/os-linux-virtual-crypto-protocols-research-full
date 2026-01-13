@@ -1,0 +1,129 @@
+Test 1
+=== Benchmark Summary: WireGost ===
+Protocol:       WireGost
+TCP Throughput: 713.76 Mbps
+UDP Throughput: 854.46 Mbps
+UDP Loss:       11.956502130922047 %
+CPU Cost:       650.94
+Efficiency:     1.09
+PPS (64b UDP):  345168
+Integrity:      PASS
+Latency (Load): 0.066 ms
+
+Test 2
+=== Benchmark Summary: WireGost ===
+Protocol:       WireGost
+TCP Throughput: 721.95 Mbps
+UDP Throughput: 862.11 Mbps
+UDP Loss:       11.168339158867967 %
+CPU Cost:       646.95
+Efficiency:     1.11
+PPS (64b UDP):  352888
+Integrity:      PASS
+Latency (Load): 0.063 ms
+
+Test 3
+=== Benchmark Summary: WireGost ===
+Protocol:       WireGost
+TCP Throughput: 750.76 Mbps
+UDP Throughput: 844.25 Mbps
+UDP Loss:       15.138656538959447 %
+CPU Cost:       667.13
+Efficiency:     1.12
+PPS (64b UDP):  336783
+Integrity:      PASS
+Latency (Load): 0.086 ms
+
+Test 4
+=== Benchmark Summary: WireGost ===
+Protocol:       WireGost
+TCP Throughput: 765.35 Mbps
+UDP Throughput: 843.67 Mbps
+UDP Loss:       15.3460182918126 %
+CPU Cost:       685.61
+Efficiency:     1.11
+PPS (64b UDP):  340294
+Integrity:      PASS
+Latency (Load): 0.093 ms
+
+Test 5
+=== Benchmark Summary: WireGost ===
+Protocol:       WireGost
+TCP Throughput: 722.01 Mbps
+UDP Throughput: 830.21 Mbps
+UDP Loss:       9.525654937219036 %
+CPU Cost:       638.76
+Efficiency:     1.13
+PPS (64b UDP):  293594
+Integrity:      PASS
+Latency (Load): 0.086 ms
+
+Test 6
+=== Benchmark Summary: WireGost ===
+Protocol:       WireGost
+TCP Throughput: 738.58 Mbps
+UDP Throughput: 839.22 Mbps
+UDP Loss:       16.833692976653907 %
+CPU Cost:       653.64
+Efficiency:     1.12
+PPS (64b UDP):  353507
+Integrity:      PASS
+Latency (Load): 0.076 ms
+
+Test 7
+=== Benchmark Summary: WireGost ===
+Protocol:       WireGost
+TCP Throughput: 762.98 Mbps
+UDP Throughput: 827.65 Mbps
+UDP Loss:       18.117962930885156 %
+CPU Cost:       692.70
+Efficiency:     1.10
+PPS (64b UDP):  333033
+Integrity:      PASS
+Latency (Load): 0.075 ms
+
+Test 8
+=== Benchmark Summary: WireGost ===
+Protocol:       WireGost
+TCP Throughput: 759.03 Mbps
+UDP Throughput: 851.70 Mbps
+UDP Loss:       11.15488230862309 %
+CPU Cost:       668.73
+Efficiency:     1.13
+PPS (64b UDP):  294061
+Integrity:      PASS
+Latency (Load): 0.082 ms
+
+Test 9
+=== Benchmark Summary: WireGost ===
+Protocol:       WireGost
+TCP Throughput: 761.64 Mbps
+UDP Throughput: 854.44 Mbps
+UDP Loss:       10.919182239258904 %
+CPU Cost:       681.81
+Efficiency:     1.11
+PPS (64b UDP):  303366
+Integrity:      PASS
+Latency (Load): 0.103 ms
+
+Test 10
+=== Benchmark Summary: WireGost ===
+Protocol:       WireGost
+TCP Throughput: 735.14 Mbps
+UDP Throughput: 849.49 Mbps
+UDP Loss:       11.817872031077842 %
+CPU Cost:       654.64
+Efficiency:     1.12
+PPS (64b UDP):  298824
+Integrity:      PASS
+Latency (Load): 0.075 ms
+
+=== Average Results (Processed 10 tests) ===
+Protocol:       Standard WireGuard (Averaged)
+TCP Throughput: 743.12 Mbps
+UDP Throughput: 845.72 Mbps
+UDP Loss:       13.1979 %
+CPU Cost:       664.09
+Efficiency:     1.11
+PPS (64b UDP):  325152
+Latency (Load): 0.080 ms

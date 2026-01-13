@@ -1,0 +1,33 @@
+\newpage
+
+\MakeGostAppendix[
+    ext={dat},
+    include={},
+    showname=true,
+    tree=false,
+    label={app:test_results}
+]{Результаты тестирования}{res/tests}
+
+\MakeGostAppendix[
+    ext={sh},
+    include={},
+    showname=true,
+    tree=false,
+    label={app:test_benchmark}
+]{Утилиты для сравнительного анализа}{res/benchmark}
+
+\MakeGostAppendix[
+    ext={c,h},
+    include={Makefile},
+    showname=true,
+    tree=true,
+    label={app:wiregost}
+]{Исходный код модуля Wiregost}{res/wiregost}
+
+\MakeGostAppendix[
+    ext={c,h},
+    include={Makefile},
+    showname=true,
+    tree=true,
+    label={app:modules}
+]{Загружаемые модули яда Linux (LKM)}{res/modules}

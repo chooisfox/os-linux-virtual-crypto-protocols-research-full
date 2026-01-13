@@ -1,0 +1,26 @@
+\begin{minted}{c}
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/module.h>
+
+MODULE_DESCRIPTION("example_module");
+MODULE_AUTHOR("chooisfox");
+MODULE_LICENSE("GPL");
+
+// Функция, вызываемая при загрузке модуля (insmod)
+static int __init my_module_init(void)
+{
+        pr_debug("Module successfully loaded\n");
+        return 0;
+}
+
+// Функция, вызываемая при выгрузке модуля (rmmod)
+static void __exit my_module_exit(void)
+{
+        pr_debug("Module successfully unloaded\n");
+}
+
+// Регистрация функций
+module_init(my_module_init);
+module_exit(my_module_exit);
+\end{minted}
